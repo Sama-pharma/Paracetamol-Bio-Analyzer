@@ -2,88 +2,107 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from io import BytesIO
 
-# 1. إعدادات الصفحة البرمجية
+# Page Configuration
 st.set_page_config(
-    page_title="Bio-AI Paracetamol Analyzer",
+    page_title="Sama Pharma Tech | Bio-Analyzer",
     page_icon="💊",
     layout="wide"
 )
 
-# 2. تصميم الواجهة (العنوان والمقدمة)
-st.title("🔬 منصة تحليل التكافؤ الحيوي: باراسيتامول")
+# Custom Styling (LTR for English)
 st.markdown("""
-هذه المنصة مخصصة لشركات الأدوية ومراكز الأبحاث (R&D) للمقارنة بين 
-**الباراسيتامول التقليدي** و **التركيبات المطورة (Nano/Enhanced)**.
-""")
+    <style>
+    .main { text-align: left; }
+    div[data-testid="stMetricValue"] { font-size: 1.8rem; }
+    </style>
+    """, unsafe_allow_html=True)
+
+st.title("🔬 Advanced Bioequivalence Analysis Platform")
+st.subheader("Sama Pharma Tech Professional Bio-Analyzer")
 
 st.divider()
 
-# 3. القائمة الجانبية (Sidebar) لمدخلات المستخدم
+# Sidebar Configuration
 with st.sidebar:
-    st.header("⚙️ إعدادات التجربة")
-    drug_name = "Paracetamol"
-    dose = st.selectbox("الجرعة (mg)", [500, 1000], index=0)
-    st.info("الباراسيتامول (Acetaminophen) هو النموذج المثالي لاختبار سرعة الامتصاص.")
-    st.write("---")
-    st.caption("تطوير: Bio-AI Analyzer Team")
-
-# 4. محرك البيانات (بيانات افتراضية دقيقة للمعاينة)
-# الوقت بالساعات
-time = np.array([0, 0.25, 0.5, 0.75, 1, 1.5, 2, 4, 6, 8])
-
-# تركيز الباراسيتامول التقليدي (Reference) μg/mL
-conc_ref = [0, 5.2, 12.5, 18.2, 20.5, 15.1, 10.2, 4.5, 1.8, 0.5]
-
-# تركيز الباراسيتامول المطور (Test - Nano/Enhanced) μg/mL
-# نلاحظ هنا امتصاص أسرع وقمة أعلى
-conc_test = [0, 8.5, 20.1, 25.5, 22.1, 14.2, 9.5, 3.8, 1.2, 0.3]
-
-# 5. عرض النتائج والرسوم البيانية
-col1, col2 = st.columns([1.5, 1])
-
-with col1:
-    st.subheader("📊 منحنى التركيز في البلازما (PK Curve)")
-    fig, ax = plt.subplots(figsize=(10, 6))
-    
-    # رسم المنحنيات
-    ax.plot(time, conc_ref, 'o--', label='Reference (Standard Tablet)', color='#1f77b4', linewidth=2)
-    ax.plot(time, conc_test, 's-', label='Test (Enhanced Formulation)', color='#2ca02c', linewidth=2)
-    
-    # تنسيق الرسم البياني
-    ax.set_xlabel("Time (Hours)", fontsize=12)
-    ax.set_ylabel("Concentration (μg/mL)", fontsize=12)
-    ax.legend()
-    ax.grid(True, linestyle='--', alpha=0.6)
-    st.pyplot(fig)
-
-with col2:
-    st.subheader("📉 نتائج التحليل الرقمي")
-    
-    # حساب AUC باستخدام قانون شبه المنحرف
-    auc_ref = np.trapz(conc_ref, time)
-    auc_test = np.trapz(conc_test, time)
-    
-    # حساب Cmax
-    cmax_ref = max(conc_ref)
-    cmax_test = max(conc_test)
-    
-    # عرض البطاقات الرقمية
-    st.metric("أقصى تركيز للتركيبة المطورة (Cmax)", f"{cmax_test} μg/mL", 
-              delta=f"{((cmax_test/cmax_ref)-1)*100:.1f}% أسرع")
-    
-    st.metric("الإتاحة الحيوية الإجمالية (AUC)", f"{auc_test:.2f}", 
-              delta=f"{((auc_test/auc_ref)-1)*100:.1f}% كفاءة")
+    st.header("📂 Data Management")
+    uploaded_file = st.file_uploader("Upload Lab Results (Excel or CSV)", type=['xlsx', 'csv'])
+    st.info("Note: The file must contain a 'Time' column and concentration columns.")
     
     st.divider()
-    st.warning("⚠️ ملاحظة: هذه النتائج مبنية على محاكاة رقمية لأغراض العرض (Demo).")
+    st.header("⚙️ Analysis Settings")
+    confidence_level = st.slider("Statistical Confidence Level", 0.80, 0.99, 0.95)
 
-# 6. التقرير النهائي
-st.divider()
-if auc_test > (0.8 * auc_ref) and auc_test < (1.25 * auc_ref):
-    st.success("✅ النتيجة: التركيبتان تقعان ضمن نطاق التكافؤ الحيوي (Bioequivalent).")
+# AUC Calculation Function (Trapezoidal Rule)
+def calculate_auc(time, concentration):
+    return np.trapz(concentration, time)
+
+if uploaded_file is not None:
+    try:
+        # Read Uploaded File
+        if uploaded_file.name.endswith('.csv'):
+            df = pd.read_csv(uploaded_file)
+        else:
+            df = pd.read_excel(uploaded_file)
+        
+        st.success(f"✅ File '{uploaded_file.name}' uploaded successfully!")
+        
+        # Layout Splitting
+        col1, col2 = st.columns([2, 1])
+        
+        with col1:
+            st.subheader("📊 Pharmacokinetic (PK) Curve")
+            fig, ax = plt.subplots(figsize=(10, 6))
+            
+            time_col = 'Time' # Assuming column name
+            if time_col in df.columns:
+                columns_to_plot = [c for c in df.columns if c != time_col]
+                for col in columns_to_plot:
+                    ax.plot(df[time_col], df[col], 'o-', label=col, linewidth=2)
+                
+                ax.set_xlabel("Time (Hours)")
+                ax.set_ylabel("Concentration (μg/mL)")
+                ax.legend()
+                ax.grid(True, linestyle='--', alpha=0.7)
+                st.pyplot(fig)
+            else:
+                st.error("Error: 'Time' column not found in the uploaded file.")
+
+        with col2:
+            st.subheader("📝 Analytical Results")
+            results = []
+            if time_col in df.columns:
+                for col in [c for c in df.columns if c != time_col]:
+                    cmax = df[col].max()
+                    tmax = df[df[col] == cmax][time_col].values[0]
+                    auc = calculate_auc(df[time_col], df[col])
+                    
+                    st.metric(f"Cmax - {col}", f"{cmax:.2f}")
+                    st.metric(f"AUC - {col}", f"{auc:.2f}")
+                    results.append({"Drug": col, "Cmax": cmax, "Tmax": tmax, "AUC": auc})
+                    st.write("---")
+            
+            # Download Results Button
+            res_df = pd.DataFrame(results)
+            csv = res_df.to_csv(index=False).encode('utf-8-sig')
+            st.download_button("📥 Download Analysis Report (CSV)", data=csv, file_name="BioAnalysis_Report.csv")
+
+    except Exception as e:
+        st.error(f"An error occurred while processing the file: {e}")
+
 else:
-    st.error("❌ النتيجة: يوجد فرق معنوي في الإتاحة الحيوية، التركيبة المطورة تتفوق في سرعة الامتصاص.")
+    # Landing View
+    st.info("👋 Welcome! Please upload your data file from the sidebar to begin analysis.")
+    
+    # Data Format Example
+    st.subheader("💡 Required Data Format Example:")
+    example_data = {
+        'Time': [0, 0.5, 1, 2, 4, 8],
+        'Reference_Drug': [0, 15, 25, 18, 10, 2],
+        'Test_Drug_Nano': [0, 22, 28, 20, 9, 1]
+    }
+    st.table(pd.DataFrame(example_data))
 
-# زر تحميل التقرير (شكلي للمعاينة)
-st.button("📥 تحميل التقرير الفني لشركة الأدوية (PDF)")
+st.divider()
+st.caption("Developed by Sama Pharma Tech - All Rights Reserved © 2024")
