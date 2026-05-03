@@ -114,7 +114,12 @@ def get_regulatory_analysis(df):
         
         cmax = np.max(conc)
         tmax = time[np.argmax(conc)]
-        auc = np.trapz(conc, time)
+        
+        # حل مشكلة AttributeError: استبدال np.trapz بـ np.trapezoid مع حماية للإصدارات القديمة
+        try:
+            auc = np.trapezoid(conc, time)
+        except AttributeError:
+            auc = np.trapz(conc, time)
         
         cv = np.std(conc)/np.mean(conc) * 100 if np.mean(conc) > 0 else 0
         results[col] = {'Cmax': cmax, 'Tmax': tmax, 'AUC': auc, 'CV': cv}
@@ -215,4 +220,4 @@ else:
     st.info("💡 للبدء: أدخل بيانات الكائن والجرعة في القائمة الجانبية ثم اختر نوع الدراسة للمحاكاة.")
 
 st.divider()
-st.caption(f"Sama Pharma Tech | Regulatory Compliance Engine v2.6 | Animal & Human Study Simulation")
+st.caption(f"Sama Pharma Tech | Regulatory Compliance Engine v2.6 | Fixed Numpy compatibility issues")
