@@ -38,8 +38,17 @@ with st.sidebar:
     admin_route = st.text_input("Route of Administration", "Oral Gavage")
     
     st.divider()
-    st.header("📊 2. Data Upload")
+    st.header("📊 2. Data Management")
     uploaded_file = st.file_uploader("Upload PK Data (Excel or CSV)", type=['xlsx', 'csv'])
+    
+    # ميزة تجريبية: زر لتحميل بيانات افتراضية لأي دواء للتجربة
+    if st.button("🚀 Load Sample Drug Data"):
+        sample_data = {
+            'Time': [0, 0.5, 1, 1.5, 2, 4, 8, 12, 24],
+            'Reference_Drug': [0, 15.2, 28.4, 32.1, 29.5, 18.2, 8.4, 3.1, 0.5],
+            'Test_Formulation': [0, 14.8, 27.9, 31.5, 30.1, 19.5, 9.2, 3.8, 0.6]
+        }
+        uploaded_file = pd.DataFrame(sample_data)
     
     st.divider()
     st.header("⚙️ 3. Regulatory Settings")
@@ -62,15 +71,19 @@ def calculate_half_life(time, conc):
     except:
         return 0
 
+# معالجة البيانات سواء كانت مرفوعة أو تجريبية
+df = None
 if uploaded_file is not None:
+    if isinstance(uploaded_file, pd.DataFrame):
+        df = uploaded_file
+    elif uploaded_file.name.endswith('.csv'):
+        df = pd.read_csv(uploaded_file)
+    else:
+        df = pd.read_excel(uploaded_file)
+
+if df is not None:
     try:
-        # قراءة البيانات المرفوعة
-        if uploaded_file.name.endswith('.csv'):
-            df = pd.read_csv(uploaded_file)
-        else:
-            df = pd.read_excel(uploaded_file)
-        
-        st.success(f"✅ Study {study_id} data loaded successfully.")
+        st.success(f"✅ Study {study_id} data is active.")
         
         # عرض ملخص بيانات التجربة
         st.info(f"📋 **Summary:** {animal_species} | Weight: {avg_weight} | Dose: {dose_level} mg/kg | Route: {admin_route}")
@@ -94,7 +107,7 @@ if uploaded_file is not None:
                 ax.grid(True, which="both", ls="-", alpha=0.5)
                 st.pyplot(fig)
                 
-                # خيار عرض المنحنى اللوغاريتمي (مهم للمراجعة العلمية)
+                # خيار عرض المنحنى اللوغاريتمي
                 if st.checkbox("Show Semi-log Plot (For Elimination Phase)"):
                     fig2, ax2 = plt.subplots(figsize=(10, 4))
                     for col in pk_cols:
@@ -121,17 +134,16 @@ if uploaded_file is not None:
                     st.write(f"**AUC(0-t):** {auc:.2f}")
                     st.write(f"**t½ (Half-life):** {t_half:.2f} h")
 
-            # حساب التكافؤ الحيوي إذا وجد دواءين للمقارنة
+            # حساب التكافؤ الحيوي
             if len(pk_cols) >= 2:
                 st.divider()
                 st.subheader("⚖️ Bioequivalence Assessment")
-                test = pk_cols[-1]  # نفترض أن الأخير هو التجريبي
-                ref = pk_cols[0]    # نفترض أن الأول هو المرجعي
+                test = pk_cols[-1]
+                ref = pk_cols[0]
                 
                 ratio_auc = (pk_results[test]['AUC'] / pk_results[ref]['AUC']) * 100
                 ratio_cmax = (pk_results[test]['Cmax'] / pk_results[ref]['Cmax']) * 100
                 
-                # دالة التحقق من حدود التكافؤ
                 def check_be(val):
                     return "✅ Passed" if be_lower <= val <= be_upper else "❌ Failed"
 
@@ -144,7 +156,7 @@ if uploaded_file is not None:
                 else:
                     st.error("The formulation is NOT BIOEQUIVALENT.")
 
-        # تجهيز البيانات للتصدير في ملف تقرير شامل
+        # تصدير البيانات
         export_data = []
         for col, val in pk_results.items():
             val_full = val.copy()
@@ -167,8 +179,7 @@ if uploaded_file is not None:
     except Exception as e:
         st.error(f"Analysis Error: {e}")
 else:
-    # واجهة الترحيب في حالة عدم رفع ملف
-    st.info("👋 Welcome! Please fill the Study Metadata and upload your concentration-time file to begin.")
+    st.info("👋 Welcome! Fill the Study Metadata, or click 'Load Sample Drug Data' in the sidebar to try it now.")
     st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/3/3a/Pharmacokinetics_curve.svg/640px-Pharmacokinetics_curve.svg.png", caption="Standard PK Profile Visualization")
 
 st.divider()
