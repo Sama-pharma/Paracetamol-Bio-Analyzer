@@ -3,14 +3,14 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-# --- إعدادات الصفحة الرسمية ---
+# --- Page Configuration ---
 st.set_page_config(
     page_title="Sama Pharma Tech | Regulatory Bio-Analyzer",
     page_icon="🧪",
     layout="wide"
 )
 
-# --- تحسين المظهر باستخدام CSS ---
+# --- Custom Styling ---
 st.markdown("""
     <style>
     .stApp { background-color: #f4f7f9; }
@@ -28,26 +28,36 @@ st.markdown("<p class='sub-header'>المحاكي المتقدم وفق معاي
 
 st.divider()
 
-# إدارة حالة البيانات باستخدام Session State
 if 'df_data' not in st.session_state:
     st.session_state.df_data = None
 
-# --- وظائف توليد البيانات بمحاكاة حقيقية (Stochastic Simulation) ---
-def simulate_be_data(mode="standard"):
-    np.random.seed(42) 
+# --- Dynamic Simulation Engine ---
+def simulate_be_data(mode, dose, weight, subject_type):
+    # إزالة التثبيت العشوائي لجعل النتائج حيوية
     time = np.array([0, 0.25, 0.5, 1, 1.5, 2, 4, 8, 12, 24])
     
+    # معامل تعديل بناءً على الوزن والجرعة (Dose/Weight scaling)
+    # نفترض أن التركيز يتناسب طردياً مع الجرعة وعكسياً مع الوزن
+    base_scalar = (dose / weight) * 10
+    
+    # تعديل المعاملات بناءً على نوع الكائن (Pharmacokinetic scaling)
+    species_factor = 1.0
+    if "Rat" in subject_type: species_factor = 0.5 # استقلاب أسرع
+    elif "Rabbit" in subject_type: species_factor = 0.8
+    
     if mode == "nano":
-        # خصائص النانو: امتصاص أسرع وتشتت أقل
-        ref_base = np.array([0, 10, 20, 35, 38, 35, 20, 10, 4, 1])
-        test_base = np.array([0, 25, 45, 55, 52, 45, 25, 12, 5, 0.8])
-        variability = 0.05 
+        # خصائص النانو: Ka أعلى (امتصاص أسرع) و Ke أقل (استقرار)
+        ref_base = np.array([0, 8, 15, 25, 28, 25, 15, 8, 3, 0.5]) * base_scalar * species_factor
+        test_base = np.array([0, 15, 30, 45, 42, 35, 20, 10, 4, 0.6]) * base_scalar * species_factor
+        variability = 0.04 # النانو عادة أكثر تجانساً
     else:
-        # خصائص المنتج التقليدي: تشتت أعلى
-        ref_base = np.array([0, 8, 18, 30, 32, 30, 18, 8, 3, 0.5])
-        test_base = ref_base * np.random.uniform(0.92, 1.08, size=len(ref_base))
+        # خصائص المنتج التقليدي
+        ref_base = np.array([0, 8, 18, 30, 32, 30, 18, 8, 3, 0.5]) * base_scalar * species_factor
+        # تذبذب عشوائي حقيقي للتجربة التقليدية
+        test_base = ref_base * np.random.uniform(0.85, 1.15, size=len(ref_base))
         variability = 0.12 
 
+    # إضافة الضجيج البيولوجي (Biological Noise)
     ref_final = ref_base + np.random.normal(0, ref_base * variability)
     test_final = test_base + np.random.normal(0, test_base * variability)
     
@@ -60,24 +70,24 @@ def simulate_be_data(mode="standard"):
         'Test': np.round(test_final, 2)
     })
 
-# --- القائمة الجانبية: إدخال كافة بيانات الدراسة ---
+# --- Sidebar: Input Parameters ---
 with st.sidebar:
     st.header("📋 بروتوكول الدراسة")
     study_id = st.text_input("رقم الدراسة (Protocol No.)", "SPT-REG-2024-V2")
-    drug_api = st.text_input("المادة الفعالة (API)", "Atorvastatin Nano-form")
+    drug_api = st.text_input("المادة الفعالة (API)", "Atorvastatin")
     
     st.divider()
     
-    st.header("🐾 بيانات الكائن الحي (Subjects)")
-    subject_type = st.selectbox("نوع الكائن", ["Human (متطوعين بشر)", "Rat (جرذان)", "Rabbit (أرانب)", "Beagle Dog (كلاب بيجل)"])
-    avg_weight = st.number_input("متوسط الوزن (kg)", value=70.0 if subject_type == "Human" else 0.25, step=0.1)
-    subject_count = st.slider("عدد العينة (N)", 6, 24, 12)
+    st.header("🐾 بيانات الكائن الحي")
+    subject_type = st.selectbox("نوع الكائن", ["Human (بشر)", "Rat (جرذان)", "Rabbit (أرانب)", "Beagle Dog (كلاب)"])
+    avg_weight = st.number_input("متوسط الوزن (kg)", value=70.0 if "Human" in subject_type else 0.25, step=0.1)
+    subject_count = st.slider("عدد العينة (N)", 6, 48, 12)
     
     st.divider()
     
-    st.header("💊 تفاصيل الجرعة (Dosing)")
-    dose_value = st.number_input("الجرعة (mg)", value=20.0)
-    admin_route = st.selectbox("طريقة الإعطاء", ["Oral (عن طريق الفم)", "IV (حقن وريدي)", "Subcutaneous (تحت الجلد)"])
+    st.header("💊 تفاصيل الجرعة")
+    dose_value = st.number_input("الجرعة (mg)", value=20.0, step=1.0)
+    admin_route = st.selectbox("طريقة الإعطاء", ["Oral (فموي)", "IV (وريدي)", "Subcutaneous"])
     fasting_state = st.radio("حالة التغذية", ["Fasted (صائم)", "Fed (بعد الأكل)"])
 
     st.divider()
@@ -94,143 +104,88 @@ with st.sidebar:
 
     st.divider()
     
-    st.header("📊 مصدر البيانات")
-    uploaded_file = st.file_uploader("رفع نتائج المختبر (Excel/CSV)", type=["csv", "xlsx"])
-    
-    if uploaded_file:
-        st.session_state.df_data = pd.read_csv(uploaded_file) if uploaded_file.name.endswith('.csv') else pd.read_excel(uploaded_file)
-    
-    st.write("أو محاكاة دراسة حقيقية:")
-    c1, c2 = st.columns(2)
-    with c1:
-        if st.button("🚀 دراسة قياسية"): simulate_be_data("standard")
-    with c2:
-        if st.button("🧪 دراسة نانوية"): simulate_be_data("nano")
+    st.write("تشغيل المحاكاة بناءً على المدخلات:")
+    if st.button("🚀 بدء تحليل المحاكاة"): 
+        mode = "nano" if dosage_form == "Nano-Carrier" else "standard"
+        simulate_be_data(mode, dose_value, avg_weight, subject_type)
 
-# --- محرك الحسابات الإحصائية والرقابية الدقيق ---
-def get_regulatory_analysis(df, n_subjects=12):
+# --- Analysis Engine ---
+def get_regulatory_analysis(df, n_subjects):
     results = {}
     for col in ['Reference', 'Test']:
         conc = df[col].values
         time = df['Time'].values
-        
         cmax = np.max(conc)
         tmax = time[np.argmax(conc)]
         
-        # حساب المساحة تحت المنحنى بدقة
         try:
             auc = np.trapezoid(conc, time)
         except AttributeError:
             auc = np.trapz(conc, time)
         
-        # حساب التشتت (Coefficient of Variation)
         cv = np.std(conc)/np.mean(conc) if np.mean(conc) > 0 else 0
-        
         results[col] = {'Cmax': cmax, 'Tmax': tmax, 'AUC': auc, 'CV': cv * 100}
     
-    # حساب النسب المئوية (Geometric Mean Ratios)
     auc_ratio = (results['Test']['AUC'] / results['Reference']['AUC'])
     cmax_ratio = (results['Test']['Cmax'] / results['Reference']['Cmax'])
     
-    # حساب فاصل الثقة 90% (CI 90%) بدقة إحصائية
-    # يستخدم الانحراف المعياري الفعلي للعينة (Pooled Standard Deviation)
+    # Enhanced Statistical CI calculation
     sd_pooled = np.sqrt((results['Test']['CV']**2 + results['Reference']['CV']**2) / 2) / 100
-    error_margin = 1.645 * (sd_pooled / np.sqrt(n_subjects)) # 1.645 هو Z-score لـ 90%
+    error_margin = 1.645 * (sd_pooled / np.sqrt(n_subjects)) 
     
     ci_low_auc = np.exp(np.log(auc_ratio) - error_margin)
     ci_high_auc = np.exp(np.log(auc_ratio) + error_margin)
     
     return results, (auc_ratio*100, cmax_ratio*100), (ci_low_auc*100, ci_high_auc*100)
 
-# --- عرض النتائج ---
+# --- Display Results ---
 if st.session_state.df_data is not None:
     df = st.session_state.df_data
-    # نمرر عدد العينة (N) للحساب الإحصائي الدقيق
-    stats_res, ratios, ci = get_regulatory_analysis(df, n_subjects=subject_count)
+    stats_res, ratios, ci = get_regulatory_analysis(df, subject_count)
     
-    # بطاقة البيانات الشاملة
     st.markdown(f"""
     <div class='info-card'>
         <div style="display: flex; justify-content: space-between; flex-wrap: wrap;">
-            <div><strong>رقم الدراسة:</strong> {study_id}</div>
-            <div><strong>المادة:</strong> {drug_api}</div>
-            <div><strong>الكائن:</strong> {subject_type} (N={subject_count})</div>
-            <div><strong>الوزن:</strong> {avg_weight} kg</div>
-            <div><strong>الجرعة:</strong> {dose_value} mg ({admin_route})</div>
-            <div><strong>الحالة:</strong> {fasting_state}</div>
+            <div><strong>Study:</strong> {study_id}</div>
+            <div><strong>Drug:</strong> {drug_api}</div>
+            <div><strong>Subject:</strong> {subject_type} ({avg_weight}kg)</div>
+            <div><strong>Dose:</strong> {dose_value}mg</div>
+            <div><strong>Formulation:</strong> {carrier}</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-    main_col, side_col = st.columns([2, 1])
+    m1, m2 = st.columns([2, 1])
 
-    with main_col:
-        st.subheader(f"📈 منحنى التركيز - الزمن (Pharmacokinetic Profile)")
-        fig, ax = plt.subplots(figsize=(10, 5.5))
-        ax.plot(df['Time'], df['Reference'], 's--', label="Reference (Market Leader)", color="#D32F2F", markersize=8)
-        ax.plot(df['Time'], df['Test'], 'o-', label=f"Test ({carrier})", color="#1A237E", linewidth=3, markersize=8)
-        
-        # رسم منطقة التشتت الإحصائي
-        ax.fill_between(df['Time'], df['Reference']*0.9, df['Reference']*1.1, color='#D32F2F', alpha=0.1)
-        ax.fill_between(df['Time'], df['Test']*0.95, df['Test']*1.05, color='#1A237E', alpha=0.1)
-
-        ax.set_xlabel("Time Post-Dose (Hours)", fontweight='bold')
-        ax.set_ylabel("Plasma Concentration (ng/mL)", fontweight='bold')
-        ax.legend(frameon=True, shadow=True)
-        ax.grid(True, which='both', linestyle=':', alpha=0.5)
+    with m1:
+        st.subheader("📊 Pharmacokinetic Profile")
+        fig, ax = plt.subplots(figsize=(10, 5))
+        ax.plot(df['Time'], df['Reference'], 's--', label="Reference", color="#D32F2F")
+        ax.plot(df['Time'], df['Test'], 'o-', label=f"Test ({carrier})", color="#1A237E", linewidth=2)
+        ax.set_xlabel("Time (h)")
+        ax.set_ylabel("Conc (ng/mL)")
+        ax.legend()
         st.pyplot(fig)
 
-    with side_col:
-        st.subheader("📊 ثوابت الحركية الدوائية")
-        for brand in ['Reference', 'Test']:
-            with st.expander(f"نتائج {brand}", expanded=True):
-                d = stats_res[brand]
-                cols = st.columns(2)
-                cols[0].metric("Cmax", f"{d['Cmax']:.2f}")
-                cols[1].metric("Tmax", f"{d['Tmax']:.2f} h")
-                st.write(f"**AUC (Total Exposure):** {d['AUC']:.2f}")
-                st.write(f"**Intra-subject CV%:** {d['CV']:.2f}%")
+    with m2:
+        st.subheader("📋 PK Metrics")
+        for b in ['Reference', 'Test']:
+            with st.expander(f"{b} Results"):
+                st.write(f"Cmax: {stats_res[b]['Cmax']:.2f}")
+                st.write(f"Tmax: {stats_res[b]['Tmax']:.2f} h")
+                st.write(f"AUC: {stats_res[b]['AUC']:.2f}")
 
     st.divider()
-    
-    # --- قسم القرار الرقابي المعتمد ---
-    st.subheader("⚖️ التقييم الإحصائي والقرار الرقابي (Statistical Inference)")
-    
-    v1, v2, v3 = st.columns(3)
-    v1.metric("AUC Point Estimate", f"{ratios[0]:.2f}%")
-    v2.metric("Cmax Point Estimate", f"{ratios[1]:.2f}%")
-    # عرض فاصل الثقة بناءً على الحسابات اللوغاريتمية الحقيقية
-    v3.metric("90% Confidence Interval", f"{ci[0]:.2f}% - {ci[1]:.2f}%")
+    st.subheader("⚖️ Bioequivalence Decision")
+    c1, c2, c3 = st.columns(3)
+    c1.metric("AUC Ratio", f"{ratios[0]:.2f}%")
+    c2.metric("Cmax Ratio", f"{ratios[1]:.2f}%")
+    c3.metric("90% CI", f"{ci[0]:.2f}% - {ci[1]:.2f}%")
 
-    st.write("")
-    # معايير القبول الدولية 80-125%
     is_be = (80 <= ci[0] <= 125) and (80 <= ci[1] <= 125)
-    
     if is_be:
-        st.markdown(f"""
-        <div class='status-passed'>
-            ✅ النتيجة: متكافئ حيوياً (Bioequivalent)<br>
-            <small>بناءً على تحليل {subject_count} عينة، يقع فاصل الثقة 90% ضمن الحدود الرقابية (80.00% - 125.00%).</small>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown("<div class='status-passed'>✅ PASSED: Products are Bioequivalent</div>", unsafe_allow_html=True)
     else:
-        st.markdown(f"""
-        <div class='status-failed'>
-            ❌ النتيجة: غير متكافئ (Non-Bioequivalent)<br>
-            <small>تحذير: فاصل الثقة ({ci[0]:.2f}% - {ci[1]:.2f}%) يخرج عن النطاق المسموح به. يوصى بزيادة حجم العينة أو تحسين التركيبة.</small>
-        </div>
-        """, unsafe_allow_html=True)
-
-    # تجهيز التقرير النهائي للتحميل
-    final_report_data = {
-        'Field': ['Study ID', 'Drug API', 'Subject', 'Weight', 'Dose', 'Route', 'Formulation', 'AUC Ratio', '90% CI Low', '90% CI High'],
-        'Value': [study_id, drug_api, subject_type, f"{avg_weight} kg", f"{dose_value} mg", admin_route, carrier, f"{ratios[0]:.2f}%", f"{ci[0]:.2f}%", f"{ci[1]:.2f}%"]
-    }
-    report_df = pd.DataFrame(final_report_data)
-    st.download_button("📥 تحميل التقرير التحليلي الدقيق", report_df.to_csv(index=False).encode('utf-8-sig'), f"Validated_BE_Report_{study_id}.csv")
-
+        st.markdown("<div class='status-failed'>❌ FAILED: Products are NOT Bioequivalent</div>", unsafe_allow_html=True)
 else:
-    st.info("💡 للبدء: أدخل بيانات البروتوكول ثم اختر 'دراسة نانوية' لمشاهدة تحليل دقيق وعلمي للتكافؤ الحيوي.")
-
-st.divider()
-st.caption(f"Sama Pharma Tech | High-Precision Statistical Engine v3.0 | 90% CI Log-Normal Distribution")
+    st.info("قم بتعديل البيانات في القائمة الجانبية ثم اضغط على 'بدء تحليل المحاكاة' لرؤية النتائج المتغيرة.")
