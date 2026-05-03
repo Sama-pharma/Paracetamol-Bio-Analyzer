@@ -33,31 +33,26 @@ if 'df_data' not in st.session_state:
 
 # --- Dynamic Simulation Engine ---
 def simulate_be_data(mode, dose, weight, subject_type):
-    # إزالة التثبيت العشوائي لجعل النتائج حيوية
     time = np.array([0, 0.25, 0.5, 1, 1.5, 2, 4, 8, 12, 24])
     
-    # معامل تعديل بناءً على الوزن والجرعة (Dose/Weight scaling)
-    # نفترض أن التركيز يتناسب طردياً مع الجرعة وعكسياً مع الوزن
+    # Dose/Weight scaling
     base_scalar = (dose / weight) * 10
     
-    # تعديل المعاملات بناءً على نوع الكائن (Pharmacokinetic scaling)
+    # Pharmacokinetic scaling by species
     species_factor = 1.0
-    if "Rat" in subject_type: species_factor = 0.5 # استقلاب أسرع
+    if "Rat" in subject_type: species_factor = 0.5 
     elif "Rabbit" in subject_type: species_factor = 0.8
     
     if mode == "nano":
-        # خصائص النانو: Ka أعلى (امتصاص أسرع) و Ke أقل (استقرار)
         ref_base = np.array([0, 8, 15, 25, 28, 25, 15, 8, 3, 0.5]) * base_scalar * species_factor
         test_base = np.array([0, 15, 30, 45, 42, 35, 20, 10, 4, 0.6]) * base_scalar * species_factor
-        variability = 0.04 # النانو عادة أكثر تجانساً
+        variability = 0.04 
     else:
-        # خصائص المنتج التقليدي
         ref_base = np.array([0, 8, 18, 30, 32, 30, 18, 8, 3, 0.5]) * base_scalar * species_factor
-        # تذبذب عشوائي حقيقي للتجربة التقليدية
         test_base = ref_base * np.random.uniform(0.85, 1.15, size=len(ref_base))
         variability = 0.12 
 
-    # إضافة الضجيج البيولوجي (Biological Noise)
+    # Biological Noise
     ref_final = ref_base + np.random.normal(0, ref_base * variability)
     test_final = test_base + np.random.normal(0, test_base * variability)
     
@@ -76,6 +71,12 @@ with st.sidebar:
     study_id = st.text_input("رقم الدراسة (Protocol No.)", "SPT-REG-2024-V2")
     drug_api = st.text_input("المادة الفعالة (API)", "Atorvastatin")
     
+    col_drugs = st.columns(2)
+    with col_drugs[0]:
+        test_brand = st.text_input("الدواء المختبر (Test)", "Sama-Nano")
+    with col_drugs[1]:
+        ref_brand = st.text_input("الدواء المرجعي (Ref)", "Lipitor")
+
     st.divider()
     
     st.header("🐾 بيانات الكائن الحي")
@@ -129,7 +130,6 @@ def get_regulatory_analysis(df, n_subjects):
     auc_ratio = (results['Test']['AUC'] / results['Reference']['AUC'])
     cmax_ratio = (results['Test']['Cmax'] / results['Reference']['Cmax'])
     
-    # Enhanced Statistical CI calculation
     sd_pooled = np.sqrt((results['Test']['CV']**2 + results['Reference']['CV']**2) / 2) / 100
     error_margin = 1.645 * (sd_pooled / np.sqrt(n_subjects)) 
     
@@ -146,11 +146,12 @@ if st.session_state.df_data is not None:
     st.markdown(f"""
     <div class='info-card'>
         <div style="display: flex; justify-content: space-between; flex-wrap: wrap;">
-            <div><strong>Study:</strong> {study_id}</div>
-            <div><strong>Drug:</strong> {drug_api}</div>
+            <div><strong>Study ID:</strong> {study_id}</div>
+            <div><strong>Active API:</strong> {drug_api}</div>
+            <div><strong>Test Drug:</strong> {test_brand}</div>
+            <div><strong>Ref Drug:</strong> {ref_brand}</div>
             <div><strong>Subject:</strong> {subject_type} ({avg_weight}kg)</div>
             <div><strong>Dose:</strong> {dose_value}mg</div>
-            <div><strong>Formulation:</strong> {carrier}</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -158,34 +159,35 @@ if st.session_state.df_data is not None:
     m1, m2 = st.columns([2, 1])
 
     with m1:
-        st.subheader("📊 Pharmacokinetic Profile")
+        st.subheader("📊 Pharmacokinetic Profile Comparison")
         fig, ax = plt.subplots(figsize=(10, 5))
-        ax.plot(df['Time'], df['Reference'], 's--', label="Reference", color="#D32F2F")
-        ax.plot(df['Time'], df['Test'], 'o-', label=f"Test ({carrier})", color="#1A237E", linewidth=2)
+        ax.plot(df['Time'], df['Reference'], 's--', label=f"Reference: {ref_brand}", color="#D32F2F")
+        ax.plot(df['Time'], df['Test'], 'o-', label=f"Test: {test_brand} ({carrier})", color="#1A237E", linewidth=2)
         ax.set_xlabel("Time (h)")
         ax.set_ylabel("Conc (ng/mL)")
         ax.legend()
         st.pyplot(fig)
 
     with m2:
-        st.subheader("📋 PK Metrics")
-        for b in ['Reference', 'Test']:
-            with st.expander(f"{b} Results"):
-                st.write(f"Cmax: {stats_res[b]['Cmax']:.2f}")
-                st.write(f"Tmax: {stats_res[b]['Tmax']:.2f} h")
-                st.write(f"AUC: {stats_res[b]['AUC']:.2f}")
+        st.subheader("📋 PK Metrics Summary")
+        brands_mapping = {'Reference': ref_brand, 'Test': test_brand}
+        for key, brand_name in brands_mapping.items():
+            with st.expander(f"Results for {brand_name}"):
+                st.write(f"Cmax: {stats_res[key]['Cmax']:.2f}")
+                st.write(f"Tmax: {stats_res[key]['Tmax']:.2f} h")
+                st.write(f"AUC: {stats_res[key]['AUC']:.2f}")
 
     st.divider()
-    st.subheader("⚖️ Bioequivalence Decision")
+    st.subheader("⚖️ Bioequivalence Decision (Test vs Reference)")
     c1, c2, c3 = st.columns(3)
-    c1.metric("AUC Ratio", f"{ratios[0]:.2f}%")
+    c1.metric(f"AUC Ratio ({test_brand}/{ref_brand})", f"{ratios[0]:.2f}%")
     c2.metric("Cmax Ratio", f"{ratios[1]:.2f}%")
     c3.metric("90% CI", f"{ci[0]:.2f}% - {ci[1]:.2f}%")
 
     is_be = (80 <= ci[0] <= 125) and (80 <= ci[1] <= 125)
     if is_be:
-        st.markdown("<div class='status-passed'>✅ PASSED: Products are Bioequivalent</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='status-passed'>✅ PASSED: {test_brand} is Bioequivalent to {ref_brand}</div>", unsafe_allow_html=True)
     else:
-        st.markdown("<div class='status-failed'>❌ FAILED: Products are NOT Bioequivalent</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='status-failed'>❌ FAILED: {test_brand} is NOT Bioequivalent to {ref_brand}</div>", unsafe_allow_html=True)
 else:
-    st.info("قم بتعديل البيانات في القائمة الجانبية ثم اضغط على 'بدء تحليل المحاكاة' لرؤية النتائج المتغيرة.")
+    st.info("قم بتعديل بيانات الدواء ودواء المقارنة في القائمة الجانبية ثم اضغط على 'بدء تحليل المحاكاة'.")
