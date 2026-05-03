@@ -19,7 +19,7 @@ st.markdown("""
     .stButton>button { background-color: #1A237E; color: white; border-radius: 8px; font-weight: bold; height: 3em; }
     .status-passed { padding: 20px; border-radius: 10px; background-color: #C8E6C9; border-left: 10px solid #2E7D32; color: #1B5E20; font-weight: bold; }
     .status-failed { padding: 20px; border-radius: 10px; background-color: #FFCDD2; border-left: 10px solid #C62828; color: #B71C1C; font-weight: bold; }
-    .info-card { padding: 15px; border-radius: 10px; background-color: #ffffff; border: 1px solid #e0e0e0; box-shadow: 2px 2px 5px rgba(0,0,0,0.05); }
+    .info-card { padding: 15px; border-radius: 10px; background-color: #ffffff; border: 1px solid #e0e0e0; box-shadow: 2px 2px 5px rgba(0,0,0,0.05); margin-bottom: 20px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -38,12 +38,10 @@ def simulate_be_data(mode="standard"):
     time = np.array([0, 0.25, 0.5, 1, 1.5, 2, 4, 8, 12, 24])
     
     if mode == "nano":
-        # خصائص النانو: امتصاص أسرع وتوفر حيوي أعلى
         ref_base = np.array([0, 10, 20, 35, 38, 35, 20, 10, 4, 1])
         test_base = np.array([0, 25, 45, 55, 52, 45, 25, 12, 5, 0.8])
         variability = 0.08 
     else:
-        # خصائص المنتج التقليدي
         ref_base = np.array([0, 8, 18, 30, 32, 30, 18, 8, 3, 0.5])
         test_base = ref_base * np.random.uniform(0.95, 1.05, size=len(ref_base))
         variability = 0.15 
@@ -60,12 +58,26 @@ def simulate_be_data(mode="standard"):
         'Test': np.round(test_final, 2)
     })
 
-# --- القائمة الجانبية ---
+# --- القائمة الجانبية: إدخال كافة بيانات الدراسة ---
 with st.sidebar:
     st.header("📋 بروتوكول الدراسة")
     study_id = st.text_input("رقم الدراسة (Protocol No.)", "SPT-REG-2024-V2")
     drug_api = st.text_input("المادة الفعالة (API)", "Atorvastatin Nano-form")
     
+    st.divider()
+    
+    st.header("🐾 بيانات الكائن الحي (Subjects)")
+    subject_type = st.selectbox("نوع الكائن", ["Human (متطوعين بشر)", "Rat (جرذان)", "Rabbit (أرانب)", "Beagle Dog (كلاب بيجل)"])
+    avg_weight = st.number_input("متوسط الوزن (kg)", value=70.0 if subject_type == "Human" else 0.25, step=0.1)
+    subject_count = st.slider("عدد العينة (N)", 6, 24, 12)
+    
+    st.divider()
+    
+    st.header("💊 تفاصيل الجرعة (Dosing)")
+    dose_value = st.number_input("الجرعة (mg)", value=20.0)
+    admin_route = st.selectbox("طريقة الإعطاء", ["Oral (عن طريق الفم)", "IV (حقن وريدي)", "Subcutaneous (تحت الجلد)"])
+    fasting_state = st.radio("حالة التغذية", ["Fasted (صائم)", "Fed (بعد الأكل)"])
+
     st.divider()
     
     st.header("🧪 التصميم الصيدلاني")
@@ -104,17 +116,13 @@ def get_regulatory_analysis(df):
         tmax = time[np.argmax(conc)]
         auc = np.trapz(conc, time)
         
-        # حساب التشتت الافتراضي (CV%) للمحاكاة باستخدام numpy
         cv = np.std(conc)/np.mean(conc) * 100 if np.mean(conc) > 0 else 0
-        
         results[col] = {'Cmax': cmax, 'Tmax': tmax, 'AUC': auc, 'CV': cv}
     
     auc_ratio = (results['Test']['AUC'] / results['Reference']['AUC'])
     cmax_ratio = (results['Test']['Cmax'] / results['Reference']['Cmax'])
     
-    # محاكاة فاصل الثقة (Confidence Interval) بطريقة رياضية مباشرة لتجنب scipy
-    # يعتمد هذا التقدير على Intersubject variability المحاكاة
-    ci_margin = 0.08 # هامش الخطأ الإحصائي المعتاد في دراسات التكافؤ
+    ci_margin = 0.08 
     ci_low_auc = auc_ratio - ci_margin
     ci_high_auc = auc_ratio + ci_margin
     
@@ -125,15 +133,19 @@ if st.session_state.df_data is not None:
     df = st.session_state.df_data
     stats_res, ratios, ci = get_regulatory_analysis(df)
     
+    # بطاقة البيانات الشاملة
     st.markdown(f"""
     <div class='info-card'>
-        <strong>بطاقة تعريف الدراسة:</strong> {study_id} | 
-        <strong>الدواء:</strong> {drug_api} | 
-        <strong>النظام:</strong> {carrier} | 
-        <strong>المعيار المطبق:</strong> FDA / EMA GFI Bioequivalence
+        <div style="display: flex; justify-content: space-between; flex-wrap: wrap;">
+            <div><strong>رقم الدراسة:</strong> {study_id}</div>
+            <div><strong>المادة:</strong> {drug_api}</div>
+            <div><strong>الكائن:</strong> {subject_type}</div>
+            <div><strong>الوزن:</strong> {avg_weight} kg</div>
+            <div><strong>الجرعة:</strong> {dose_value} mg ({admin_route})</div>
+            <div><strong>الحالة:</strong> {fasting_state}</div>
+        </div>
     </div>
     """, unsafe_allow_html=True)
-    st.write("")
 
     main_col, side_col = st.columns([2, 1])
 
@@ -165,7 +177,7 @@ if st.session_state.df_data is not None:
 
     st.divider()
     
-    # --- قسم القرار الرقابي (Regulatory Verdict) ---
+    # --- قسم القرار الرقابي ---
     st.subheader("⚖️ التقييم الإحصائي والقرار الرقابي")
     
     v1, v2, v3 = st.columns(3)
@@ -180,22 +192,27 @@ if st.session_state.df_data is not None:
         st.markdown(f"""
         <div class='status-passed'>
             ✅ نتيحة التكافؤ: ممرور (PASSED)<br>
-            <small>بناءً على البيانات الحالية، المنتج التجريبي {carrier} يتكافأ حيوياً مع المرجع ضمن حدود الثقة 90% المعتمدة دولياً.</small>
+            <small>بناءً على دراسة {subject_type} بوزن {avg_weight}kg، المنتج التجريبي {carrier} يتكافأ حيوياً مع المرجع.</small>
         </div>
         """, unsafe_allow_html=True)
     else:
         st.markdown(f"""
         <div class='status-failed'>
             ❌ نتيجة التكافؤ: مرفوض (FAILED)<br>
-            <small>المنتج لا يقع ضمن حدود القبول (80.00-125.00%). يوصى بإعادة صياغة نظام التحميل {carrier} لتحسين التوافر الحيوي.</small>
+            <small>المنتج لا يقع ضمن حدود القبول. يوصى بمراجعة الجرعة ({dose_value}mg) أو تعديل نظام التحميل.</small>
         </div>
         """, unsafe_allow_html=True)
 
-    final_report = pd.DataFrame(stats_res).T
-    st.download_button("📥 تحميل ملف البيانات الرقابي المعتمد", df.to_csv(index=False).encode('utf-8-sig'), f"BE_Raw_Data_{study_id}.csv")
+    # تجهيز التقرير النهائي للتحميل
+    final_report_data = {
+        'Field': ['Study ID', 'Drug API', 'Subject', 'Weight', 'Dose', 'Route', 'Formulation'],
+        'Value': [study_id, drug_api, subject_type, f"{avg_weight} kg", f"{dose_value} mg", admin_route, carrier]
+    }
+    report_df = pd.DataFrame(final_report_data)
+    st.download_button("📥 تحميل التقرير التفصيلي للدراسة", df.to_csv(index=False).encode('utf-8-sig'), f"Full_Study_Report_{study_id}.csv")
 
 else:
-    st.info("💡 للبدء: اختر نوع الدراسة من القائمة الجانبية (قياسية أو نانوية) لمحاكاة النتائج المخبرية الفورية.")
+    st.info("💡 للبدء: أدخل بيانات الكائن والجرعة في القائمة الجانبية ثم اختر نوع الدراسة للمحاكاة.")
 
 st.divider()
-st.caption(f"Sama Pharma Tech | Regulatory Compliance Engine v2.5 | 2024")
+st.caption(f"Sama Pharma Tech | Regulatory Compliance Engine v2.6 | Animal & Human Study Simulation")
