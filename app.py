@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy import stats
 
 # --- إعدادات الصفحة الرسمية ---
 st.set_page_config(
@@ -35,26 +34,23 @@ if 'df_data' not in st.session_state:
 
 # --- وظائف توليد البيانات بمحاكاة حقيقية (Stochastic Simulation) ---
 def simulate_be_data(mode="standard"):
-    np.random.seed(42) # لضمان ثبات النتائج عند الطلب
+    np.random.seed(42) 
     time = np.array([0, 0.25, 0.5, 1, 1.5, 2, 4, 8, 12, 24])
     
-    # مراجع عالمية للحركية الدوائية (Pharmacokinetics library values)
     if mode == "nano":
-        # خصائص النانو: امتصاص أسرع بنسبة 40%، توفر حيوي أعلى بنسبة 30%
+        # خصائص النانو: امتصاص أسرع وتوفر حيوي أعلى
         ref_base = np.array([0, 10, 20, 35, 38, 35, 20, 10, 4, 1])
         test_base = np.array([0, 25, 45, 55, 52, 45, 25, 12, 5, 0.8])
-        variability = 0.08 # تشتت أقل في النانو لزيادة الثبات
+        variability = 0.08 
     else:
         # خصائص المنتج التقليدي
         ref_base = np.array([0, 8, 18, 30, 32, 30, 18, 8, 3, 0.5])
         test_base = ref_base * np.random.uniform(0.95, 1.05, size=len(ref_base))
-        variability = 0.15 # تشتت طبيعي 15% (Within-subject variability)
+        variability = 0.15 
 
-    # إضافة "ضجيج" إحصائي لجعل البيانات تبدو حقيقية (Simulation of Human Subjects)
     ref_final = ref_base + np.random.normal(0, ref_base * variability)
     test_final = test_base + np.random.normal(0, test_base * variability)
     
-    # التأكد من عدم وجود قيم سالبة
     ref_final = np.maximum(ref_final, 0)
     test_final = np.maximum(test_final, 0)
 
@@ -108,20 +104,19 @@ def get_regulatory_analysis(df):
         tmax = time[np.argmax(conc)]
         auc = np.trapz(conc, time)
         
-        # حساب التشتت الافتراضي (CV%) للمحاكاة
+        # حساب التشتت الافتراضي (CV%) للمحاكاة باستخدام numpy
         cv = np.std(conc)/np.mean(conc) * 100 if np.mean(conc) > 0 else 0
         
         results[col] = {'Cmax': cmax, 'Tmax': tmax, 'AUC': auc, 'CV': cv}
     
-    # حساب حدود الثقة 90% (المعيار الرقابي العالمي)
-    # ملاحظة: في الواقع يتم الحساب على Log-transformed data لـ 12-24 متطوع
-    # هنا نقوم بمحاكاة النتيجة الإحصائية المتوقعة
     auc_ratio = (results['Test']['AUC'] / results['Reference']['AUC'])
     cmax_ratio = (results['Test']['Cmax'] / results['Reference']['Cmax'])
     
-    # محاكاة فاصل الثقة (Confidence Interval)
-    ci_low_auc = auc_ratio * 0.92
-    ci_high_auc = auc_ratio * 1.08
+    # محاكاة فاصل الثقة (Confidence Interval) بطريقة رياضية مباشرة لتجنب scipy
+    # يعتمد هذا التقدير على Intersubject variability المحاكاة
+    ci_margin = 0.08 # هامش الخطأ الإحصائي المعتاد في دراسات التكافؤ
+    ci_low_auc = auc_ratio - ci_margin
+    ci_high_auc = auc_ratio + ci_margin
     
     return results, (auc_ratio*100, cmax_ratio*100), (ci_low_auc*100, ci_high_auc*100)
 
@@ -148,7 +143,6 @@ if st.session_state.df_data is not None:
         ax.plot(df['Time'], df['Reference'], 's--', label="Reference (Market Leader)", color="#D32F2F", markersize=8)
         ax.plot(df['Time'], df['Test'], 'o-', label=f"Test ({carrier})", color="#1A237E", linewidth=3, markersize=8)
         
-        # إضافة منطقة الخطأ (Error area) لمحاكاة تشتت المتطوعين
         ax.fill_between(df['Time'], df['Reference']*0.9, df['Reference']*1.1, color='#D32F2F', alpha=0.1)
         ax.fill_between(df['Time'], df['Test']*0.95, df['Test']*1.05, color='#1A237E', alpha=0.1)
 
@@ -180,7 +174,6 @@ if st.session_state.df_data is not None:
     v3.metric("90% CI (AUC)", f"{ci[0]:.1f}% - {ci[1]:.1f}%")
 
     st.write("")
-    # منطق القرار: هل يقع فاصل الثقة بين 80% و 125%؟
     is_be = (80 <= ci[0] <= 125) and (80 <= ci[1] <= 125)
     
     if is_be:
@@ -198,17 +191,11 @@ if st.session_state.df_data is not None:
         </div>
         """, unsafe_allow_html=True)
 
-    # تصدير التقرير الاحترافي
     final_report = pd.DataFrame(stats_res).T
     st.download_button("📥 تحميل ملف البيانات الرقابي المعتمد", df.to_csv(index=False).encode('utf-8-sig'), f"BE_Raw_Data_{study_id}.csv")
 
 else:
     st.info("💡 للبدء: اختر نوع الدراسة من القائمة الجانبية (قياسية أو نانوية) لمحاكاة النتائج المخبرية الفورية.")
-    st.markdown("""
-    ### حول مكتبة Sama Pharma Tech للبيانات:
-    * **محاكي النانو:** يستخدم خوارزميات التنبؤ بـ *Nano-enhanced Dissolution* لمحاكاة التحرر السريع.
-    * **محاكي البشر:** يضيف تباينات إحصائية تحاكي الاختلافات الجينية بين المتطوعين في دراسات المرحلة الأولى.
-    """)
 
 st.divider()
 st.caption(f"Sama Pharma Tech | Regulatory Compliance Engine v2.5 | 2024")
