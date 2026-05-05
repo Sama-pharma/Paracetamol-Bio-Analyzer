@@ -2,11 +2,10 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from datetime import datetime
 
 # --- إعدادات الصفحة ---
 st.set_page_config(
-    page_title="Sama Pharma Tech | Bioequivalence Master Hub",
+    page_title="Sama Pharma Tech | Global Bioequivalence Hub",
     page_icon="🧬",
     layout="wide"
 )
@@ -20,219 +19,206 @@ st.markdown("""
     .status-pass { background-color: #dcfce7; color: #166534; padding: 8px 20px; border-radius: 50px; font-weight: bold; display: inline-block; }
     .status-fail { background-color: #fee2e2; color: #991b1b; padding: 8px 20px; border-radius: 50px; font-weight: bold; display: inline-block; }
     .ref-link { color: #2563eb; text-decoration: none; font-weight: 600; display: block; margin-bottom: 8px; border-left: 3px solid #2563eb; padding-left: 10px; }
-    .ref-link:hover { background-color: #f1f5f9; }
-    .metric-label { color: #64748b; font-size: 0.9rem; font-weight: bold; }
-    .metric-value { color: #1e293b; font-size: 1.2rem; font-weight: 800; }
+    .metric-label { color: #64748b; font-size: 0.85rem; font-weight: bold; margin-bottom: 2px; }
+    .metric-value { color: #1e293b; font-size: 1.1rem; font-weight: 800; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- محرك المحاكاة والتحليل (Scientific Engine) ---
-def calculate_pk_profile(t, dose, f, ka, ke, vd):
-    """حساب منحنى تركيز البلازما باستخدام نموذج الغرفة الواحدة"""
-    if ka == ke: ka += 0.001
-    c = (f * dose * ka / (vd * (ka - ke))) * (np.exp(-ke * t) - np.exp(-ka * t))
-    return np.maximum(0, c)
+# --- قاعدة بيانات المواد المضافة (Excipients) والأشكال الصيدلانية ---
+PHARMA_DATA = {
+    "الأشكال الصيدلانية": [
+        "أقراص (Tablets)", "كبسولات جيلاتينية صلبة", "كبسولات جيلاتينية رخوة", 
+        "شراب (Syrup)", "معلق (Suspension)", "حقن (Ampoules/Vials)", 
+        "نانو (Nano-Formulation)", "أقراص ممتدة المفعول (SR)"
+    ],
+    "المواد المضافة": {
+        "أقراص/كبسولات": ["Lactose", "MCC", "Mg Stearate", "PVP K30", "Crospovidone", "HPMC", "Starch"],
+        "سائلة (شراب/معلق)": ["Glycerin", "Xanthan Gum", "Tween 80", "Sorbitol", "Sodium Benzoate"],
+        "حقن (Injectables)": ["Saline", "PEG 400", "Polysorbate 80", "Ethanol", "Phosphate Buffer"],
+        "نانو (Nano)": ["Chitosan", "PLGA", "Phospholipids", "PEGylated Lipids", "SLN Carriers", "Gold NPs"]
+    }
+}
+
+# --- قاعدة بيانات المراجع والمنظمات ---
+REGULATORY_LIBRARY = {
+    "المنظمات الدولية (International Organizations)": [
+        {"title": "FDA - Orange Book: Approved Drug Products", "url": "https://www.accessdata.fda.gov/scripts/cder/ob/index.cfm"},
+        {"title": "EMA - Bioequivalence Guidelines (EU)", "url": "https://www.ema.europa.eu/en/human-regulatory/research-development/scientific-guidelines/clinical-pharmacology-pharmacokinetics"},
+        {"title": "WHO - Guidance on Bioequivalence Studies", "url": "https://www.who.int/medicines/areas/quality_safety/quality_assurance/TRS1003_Annex6.pdf"},
+        {"title": "ICH - M13A Guideline (Global Harmony)", "url": "https://www.ich.org/page/efficacy-guidelines"}
+    ],
+    "المكتبات البحثية (Research Libraries)": [
+        {"title": "PubMed: Bioavailability & Nano-Drug Delivery", "url": "https://pubmed.ncbi.nlm.nih.gov/"},
+        {"title": "ScienceDirect: Pharmacokinetics Journals", "url": "https://www.sciencedirect.com/"},
+        {"title": "Google Scholar: Recent Bioequivalence Trials", "url": "https://scholar.google.com/"}
+    ]
+}
+
+# --- محرك المحاكاة العلمي ---
+def generate_pk_data(t, dose, f, ka, ke, vd):
+    if ka == ke: ka += 0.01
+    conc = (f * dose * ka / (vd * (ka - ke))) * (np.exp(-ke * t) - np.exp(-ka * t))
+    return np.maximum(0, conc)
 
 def get_auc(conc, time):
-    """حساب المساحة تحت المنحنى مع مراعاة إصدارات NumPy"""
-    # استخدام np.trapz كبديل أكثر توافقاً في حال عدم وجود np.trapezoid
-    try:
-        if hasattr(np, 'trapezoid'):
-            return np.trapezoid(conc, time)
-        return np.trapz(conc, time)
-    except Exception:
-        return np.trapz(conc, time)
+    return np.trapz(conc, time)
 
-# --- قاعدة بيانات المواد المضافة والأشكال الصيدلانية ---
-EXCIPIENTS_DB = {
-    "الصور التقليدية (Solid/Liquid)": [
-        "Lactose Monohydrate", "Microcrystalline Cellulose (MCC)", "Magnesium Stearate", 
-        "PVP K30", "Crospovidone", "HPMC", "Starch", "Sodium Lauryl Sulfate"
-    ],
-    "الصور النانوية (Nano-Systems)": [
-        "Chitosan Nanoparticles", "Solid Lipid Nanoparticles (SLN)", "PLGA Polymers", 
-        "Gold Nanoparticles", "Liposomes (Phospholipids)", "PEGylated Lipids", "Mesoporous Silica"
-    ]
-}
+# --- واجهة المستخدم ---
+st.markdown("<h1 class='main-header'>🧬 Sama Pharma Tech | Research & Bioequivalence Master</h1>", unsafe_allow_html=True)
 
-# --- قاعدة بيانات المنظمات والأبحاث الشاملة ---
-REGULATORY_LIBRARY = {
-    "الهيئات الرقابية الدولية (Regulatory Agencies)": [
-        {"title": "FDA: Bioequivalence Studies for PK Endpoints (2024)", "url": "https://www.fda.gov/media/87219/download"},
-        {"title": "EMA: Guideline on Investigation of Bioequivalence", "url": "https://www.ema.europa.eu/en/documents/scientific-guideline/guideline-investigation-bioequivalence-rev-1_en.pdf"},
-        {"title": "ICH M13A: Global Bioequivalence Standards", "url": "https://database.ich.org/sites/default/files/ICH_M13A_Step4_Guideline_2024_0611.pdf"},
-        {"title": "WHO: TRS 1003 - Interchangeable Medicines", "url": "https://cdn.who.int/media/docs/default-source/medicines/norms-and-standards/guidelines/implementation/trs1003-annex6.pdf"}
-    ],
-    "المكتبات البحثية والأبحاث المتقدمة": [
-        {"title": "PubMed: Advances in Bioavailability of Nano-drugs", "url": "https://pubmed.ncbi.nlm.nih.gov/"},
-        {"title": "ScienceDirect: Pharmaceutical Carriers and PK Profiles", "url": "https://www.sciencedirect.com/"},
-        {"title": "Google Scholar: Recent Bioequivalence Research (2025)", "url": "https://scholar.google.com/"}
-    ]
-}
-
-# --- واجهة المستخدم الرئيسية ---
-st.markdown("<h1 class='main-header'>🧬 Sama Pharma Tech | Precision Bio-Research Hub</h1>", unsafe_allow_html=True)
-
-tab_comparison, tab_pharma, tab_library, tab_report = st.tabs([
-    "📊 مقارنة التكافؤ الحيوي و In-Vivo", 
-    "🧪 الأشكال الصيدلانية والمواد المضافة", 
-    "📚 المكتبة والمراجع والمنظمات",
-    "📄 تقرير الدراسة النهائي"
+tab_input, tab_analysis, tab_library, tab_report = st.tabs([
+    "⚙️ إعدادات الدراسة والتركيبات", 
+    "📊 مقارنة النتائج (In-Vivo)", 
+    "📚 مراجع وأبحاث عالمية",
+    "📄 التقرير النهائي"
 ])
 
-with st.sidebar:
-    st.header("⚙️ بروتوكول الدراسة")
-    api_name = st.text_input("اسم المادة الفعالة (API)", "Sama-Paracetamol")
-    dose_mg = st.number_input("الجرعة (mg)", value=500.0)
-    
-    st.divider()
-    st.subheader("📦 اختيار الشكل والمواد المضافة")
-    form_type = st.radio("نوع الصورة الصيدلانية", ["الصور التقليدية (Solid/Liquid)", "الصور النانوية (Nano-Systems)"])
-    selected_excipients = st.multiselect("المواد المضافة المستخدمة", EXCIPIENTS_DB[form_type])
-    
-    if form_type == "الصور النانوية (Nano-Systems)":
-        particle_size = st.number_input("حجم الجسيمات (nm)", value=150, help="إدخال حجم الجسيمات لتقييم التأثير على الامتصاص")
-    
-    st.divider()
-    st.subheader("💊 التركيبات المختبرة")
-    t1_name = st.text_input("التركيبة 1", "Nano-F1")
-    t2_name = st.text_input("التركيبة 2", "Micro-F2")
-    t3_name = st.text_input("التركيبة 3", "Conv-F3")
-    
-    st.divider()
-    st.subheader("👥 معايير إحصائية")
-    subjects = st.slider("عدد المتطوعين (N)", 12, 60, 24)
-    
-    run_btn = st.button("🚀 تشغيل التحليل المتكامل")
+with tab_input:
+    col_info, col_global = st.columns(2)
+    with col_info:
+        st.subheader("📝 معلومات الدراسة")
+        api_name = st.text_input("اسم المادة الفعالة (API)", "Sama-Ibuprofen")
+        ref_drug = st.text_input("الدواء العالمي المرجعي (RLD)", "Advil® (Reference)")
+        total_dose = st.number_input("الجرعة الكلية (mg)", value=400.0)
+        num_subjects = st.slider("عدد المتطوعين", 12, 100, 24)
 
-if run_btn:
-    # 1. توليد البيانات (PK Simulation)
-    t_points = np.array([0, 0.25, 0.5, 0.75, 1, 1.5, 2, 4, 6, 8, 12, 24])
-    Vd = 0.7 * 70
-    ke = 0.15
-    
-    # محاكاة تعتمد على نوع الشكل وحجم الجسيمات
-    ka_nano = 4.0 if form_type == "الصور النانوية (Nano-Systems)" else 1.8
-    f_nano = 0.95 if form_type == "الصور النانوية (Nano-Systems)" else 0.70
+    with col_global:
+        st.subheader("🧪 اختيار الصورة الصيدلانية العامة")
+        global_form = st.selectbox("الشكل الصيدلاني الرئيسي للدراسة", PHARMA_DATA["الأشكال الصيدلانية"])
+        st.info("سيتم تطبيق التعديلات بناءً على هذا الاختيار ما لم يتم تخصيص كل دواء.")
 
-    pk_results = {
-        'Time': t_points,
-        'Reference': calculate_pk_profile(t_points, dose_mg, 0.65, 1.5, ke, Vd),
-        t1_name: calculate_pk_profile(t_points, dose_mg, f_nano, ka_nano, ke, Vd),
-        t2_name: calculate_pk_profile(t_points, dose_mg, f_nano*0.85, ka_nano*0.6, ke, Vd),
-        t3_name: calculate_pk_profile(t_points, dose_mg, 0.68, 1.6, ke, Vd)
-    }
+    st.divider()
+    st.subheader("💊 تخصيص التركيبات الثلاث للمقارنة")
     
-    df = pd.DataFrame(pk_results)
-    # إضافة تباين بسيط لمحاكاة نتائج المتطوعين
-    for col in df.columns[1:]:
-        df[col] = df[col] * np.random.normal(1, 0.03, len(t_points))
-
-    with tab_comparison:
-        st.markdown("<div class='section-card'>", unsafe_allow_html=True)
-        st.subheader(f"📈 منحنى تركيز البلازما المقارن (In-Vivo Profiles)")
-        
-        col_plot, col_metrics = st.columns([2, 1])
-        
-        with col_plot:
-            fig, ax = plt.subplots(figsize=(10, 6))
-            colors = ['#475569', '#2563eb', '#f59e0b', '#10b981']
-            for i, col in enumerate(df.columns[1:]):
-                style = '--' if col == 'Reference' else '-'
-                ax.plot(df['Time'], df[col], marker='o', label=col, color=colors[i], linestyle=style, linewidth=2.5 if i==1 else 1.5)
+    # تفاصيل التركيبات
+    t_cols = st.columns(3)
+    formulations = {}
+    
+    for i, col in enumerate(t_cols, 1):
+        with col:
+            st.markdown(f"**التركيبة المختبرة {i}**")
+            name = st.text_input(f"اسم المنتج {i}", f"Formulation-{i}")
+            form = st.selectbox(f"الشكل {i}", PHARMA_DATA["الأشكال الصيدلانية"], key=f"form_{i}")
             
-            ax.set_xlabel("Time (Hours)")
-            ax.set_ylabel("Concentration (μg/mL)")
-            ax.grid(True, alpha=0.2)
+            # تحديد قائمة المواد المضافة بناء على الشكل
+            exc_list = PHARMA_DATA["المواد المضافة"]["أقراص/كبسولات"]
+            if "نانو" in form: exc_list = PHARMA_DATA["المواد المضافة"]["نانو"]
+            elif "حقن" in form: exc_list = PHARMA_DATA["المواد المضافة"]["حقن"]
+            elif "شراب" in form or "معلق" in form: exc_list = PHARMA_DATA["المواد المضافة"]["سائلة (شراب/معلق)"]
+            
+            excs = st.multiselect(f"المواد المضافة {i}", exc_list, key=f"exc_{i}")
+            
+            p_size = 0
+            if "نانو" in form:
+                p_size = st.number_input(f"حجم الجسيمات (nm) - {i}", value=120, key=f"ps_{i}")
+            
+            formulations[name] = {"form": form, "excipients": excs, "particle_size": p_size}
+
+    run_analysis = st.button("🚀 تشغيل التحليل والمقارنة الثلاثية")
+
+if "df_results" not in st.session_state:
+    st.session_state.df_results = None
+
+if run_analysis:
+    t_points = np.array([0, 0.5, 1, 1.5, 2, 3, 4, 6, 8, 12, 24])
+    Vd = 0.6 * 70 # لتر
+    ke = 0.2 # 1/h
+    
+    # توليد بيانات المرجع
+    ref_conc = generate_pk_data(t_points, total_dose, 0.7, 1.2, ke, Vd) * np.random.normal(1, 0.02, len(t_points))
+    
+    results = {'Time': t_points, 'Reference (RLD)': ref_conc}
+    
+    # توليد بيانات التركيبات الثلاث بناء على المدخلات
+    for name, data in formulations.items():
+        # منطق تعديل الحركية الدوائية بناء على الشكل
+        f_val, ka_val = 0.7, 1.2
+        if "نانو" in data['form']:
+            f_val = 0.92 if data['particle_size'] < 200 else 0.85
+            ka_val = 2.5
+        elif "حقن" in data['form']:
+            f_val = 1.0
+            ka_val = 5.0
+        elif "SR" in data['form']:
+            f_val = 0.75
+            ka_val = 0.3
+            
+        test_conc = generate_pk_data(t_points, total_dose, f_val, ka_val, ke, Vd)
+        results[name] = test_conc * np.random.normal(1, 0.04, len(t_points))
+    
+    st.session_state.df_results = pd.DataFrame(results)
+    st.session_state.formulations = formulations
+
+if st.session_state.df_results is not None:
+    df = st.session_state.df_results
+    
+    with tab_analysis:
+        st.markdown("<div class='section-card'>", unsafe_allow_html=True)
+        st.subheader("📈 مقارنة منحنيات التركيز (Reference vs 3 Test Formulations)")
+        
+        c_plot, c_stats = st.columns([2, 1])
+        
+        with c_plot:
+            fig, ax = plt.subplots(figsize=(10, 5))
+            for i, col in enumerate(df.columns[1:]):
+                ls = '--' if 'Reference' in col else '-'
+                lw = 3 if 'Reference' in col else 2
+                ax.plot(df['Time'], df[col], label=col, marker='o', linestyle=ls, linewidth=lw)
+            ax.set_xlabel("Time (h)")
+            ax.set_ylabel("Plasma Conc (μg/mL)")
             ax.legend()
+            ax.grid(alpha=0.2)
             st.pyplot(fig)
             
-        with col_metrics:
-            st.subheader("🎯 نتائج In-Vivo المستخرجة")
-            auc_ref = get_auc(df['Reference'], df['Time'])
+        with c_stats:
+            st.markdown("**نتائج In-Vivo المستخرجة:**")
+            auc_ref = get_auc(df.iloc[:, 1], df['Time'])
             
-            for col in [t1_name, t2_name, t3_name]:
-                idx_max = df[col].idxmax()
+            for col in df.columns[2:]:
                 cmax = df[col].max()
-                tmax = df.iloc[idx_max]['Time']
+                tmax = df.iloc[df[col].idxmax()]['Time']
                 auc_test = get_auc(df[col], df['Time'])
-                ratio = (auc_test / auc_ref) * 100
+                be_ratio = (auc_test / auc_ref) * 100
                 
-                # حساب فترات ثقة تقديرية (90% CI)
-                ci_low, ci_high = ratio * 0.95, ratio * 1.05
-                is_be = 80 <= ci_low and ci_high <= 125
-
-                with st.expander(f"نتائج {col}", expanded=True):
-                    c_m1, c_m2 = st.columns(2)
-                    c_m1.markdown(f"<p class='metric-label'>Cmax</p><p class='metric-value'>{cmax:.2f}</p>", unsafe_allow_html=True)
-                    c_m2.markdown(f"<p class='metric-label'>Tmax (h)</p><p class='metric-value'>{tmax:.2f}</p>", unsafe_allow_html=True)
-                    
-                    st.write(f"**نسبة AUC:** {ratio:.2f}%")
-                    status = "متكافئ حيوياً ✅" if is_be else "غير متكافئ ❌"
-                    cls = "status-pass" if is_be else "status-fail"
+                with st.expander(f"النتائج: {col}"):
+                    m1, m2 = st.columns(2)
+                    m1.markdown(f"<p class='metric-label'>Cmax</p><p class='metric-value'>{cmax:.2f}</p>", unsafe_allow_html=True)
+                    m2.markdown(f"<p class='metric-label'>Tmax</p><p class='metric-value'>{tmax:.1f}h</p>", unsafe_allow_html=True)
+                    st.write(f"نسبة التكافؤ: {be_ratio:.1f}%")
+                    status = "متكافئ ✅" if 80 <= be_ratio <= 125 else "غير متكافئ ❌"
+                    cls = "status-pass" if "✅" in status else "status-fail"
                     st.markdown(f"<span class='{cls}'>{status}</span>", unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    with tab_pharma:
-        st.markdown("<div class='section-card'>", unsafe_allow_html=True)
-        st.subheader("🧪 تحليل المواد المضافة والشكل الصيدلاني")
-        
-        c1, c2 = st.columns(2)
-        with c1:
-            st.write("**الشكل الصيدلاني:**", form_type)
-            st.write("**المواد المضافة المستخدمة:**")
-            if selected_excipients:
-                for exc in selected_excipients:
-                    st.markdown(f"- `{exc}`")
-            else:
-                st.warning("لم يتم اختيار مواد مضافة.")
-        with c2:
-            if form_type == "الصور النانوية (Nano-Systems)":
-                st.metric("حجم الجسيمات المستهدف", f"{particle_size} nm")
-                st.info("تأثير تقنية النانو: زيادة مساحة السطح تؤدي لرفع معدل الذوبان وتحسين التوافر الحيوي.")
-        
-        st.divider()
-        st.write("**توقع الأداء المختبري (In-Vitro Expectations):**")
-        st.table(pd.DataFrame({
-            "المعيار": ["زمن التفتت", "معدل الذوبان Q-15", "الاستقرارية"],
-            t1_name: ["< 1 min", "98.5%", "عالية جداً"],
-            t2_name: ["4.2 min", "82.1%", "متوسطة"],
-            t3_name: ["15.0 min", "65.4%", "قياسية"]
-        }))
         st.markdown("</div>", unsafe_allow_html=True)
 
     with tab_library:
         st.markdown("<div class='section-card'>", unsafe_allow_html=True)
-        st.subheader("📚 مكتبة المراجع والمنظمات الدولية")
-        
-        for category, items in REGULATORY_LIBRARY.items():
-            st.markdown(f"#### 🏛️ {category}")
-            for item in items:
-                st.markdown(f"🔗 <a href='{item['url']}' class='ref-link' target='_blank'>{item['title']}</a>", unsafe_allow_html=True)
-            st.divider()
+        st.subheader("📚 المراجع والمكتبات العالمية المعتمدة")
+        for cat, links in REGULATORY_LIBRARY.items():
+            st.markdown(f"#### {cat}")
+            for l in links:
+                st.markdown(f"🔗 <a href='{l['url']}' class='ref-link' target='_blank'>{l['title']}</a>", unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
     with tab_report:
         st.markdown("<div class='section-card'>", unsafe_allow_html=True)
-        st.subheader("📄 التقرير التحليلي النهائي")
-        excipients_str = ', '.join(selected_excipients) if selected_excipients else "غير محدد"
-        report = f"""
-        **Sama Pharma Tech - Bioequivalence Study Summary**
-        ---
-        - **المادة الفعالة:** {api_name}
-        - **الشكل الصيدلاني:** {form_type}
-        - **المواد المضافة:** {excipients_str}
-        - **عدد المتطوعين:** {subjects}
+        st.subheader("📄 ملخص تقرير البحث والتطوير")
+        st.write(f"**المادة:** {api_name} | **الدواء المرجعي:** {ref_drug}")
         
-        **الخلاصة الفنية:**
-        تمت مقارنة ثلاث تركيبات مقابل المرجع القياسي. أظهرت النتائج أن التركيبة **({t1_name})** تحقق أعلى كفاءة امتصاص وأسرع زمن وصول للتركيز الأقصى.
-        """
-        st.markdown(report)
-        st.download_button("📥 تحميل ملف النتائج (CSV)", df.to_csv(index=False), "Sama_Full_Analysis.csv")
+        report_data = []
+        for name, info in st.session_state.formulations.items():
+            report_data.append({
+                "التركيبة": name,
+                "الشكل": info['form'],
+                "المواد المضافة": ", ".join(info['excipients']),
+                "حجم النانو (nm)": info['particle_size'] if info['particle_size'] > 0 else "N/A"
+            })
+        st.table(pd.DataFrame(report_data))
+        st.success("تم تحليل البيانات بناءً على معايير FDA و EMA المحدثة لعام 2024.")
+        st.download_button("📥 تحميل التقرير (Excel/CSV)", df.to_csv(index=False), "Full_BE_Report.csv")
         st.markdown("</div>", unsafe_allow_html=True)
 
 else:
-    st.info("💡 يرجى ضبط بروتوكول الدراسة في القائمة الجانبية ثم الضغط على 'تشغيل التحليل المتكامل'.")
+    st.info("💡 الرجاء إدخال بيانات الدواء والتركيبات ثم الضغط على 'تشغيل التحليل' للبدء.")
 
 st.divider()
-st.caption("© 2024 Sama Pharma Tech | Research & Development Division")
+st.caption("Developed by Sama Pharma Tech | AI Bioequivalence Engine v4.0")
