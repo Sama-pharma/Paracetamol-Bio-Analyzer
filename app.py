@@ -17,6 +17,7 @@ st.markdown("""
     .metric-card { background: white; padding: 15px; border-radius: 10px; border-right: 5px solid #00a8cc; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
     .reference-section { background: #f0f4f8; padding: 20px; border-radius: 15px; border: 1px solid #d1d9e6; }
     .test-box { background: white; padding: 15px; border-radius: 10px; border: 1px solid #e1e8ed; margin-bottom: 10px; }
+    .sidebar-header { font-size: 1.2rem; font-weight: bold; color: #003366; margin-top: 10px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -41,39 +42,50 @@ def pk_model(t, dose, f, ka, ke, vd, weight):
     except:
         return np.zeros_like(t)
 
-# --- قاعدة بيانات المواد والمنظمات والمراجع ---
+# --- قاعدة بيانات الأدوية الموسعة ---
 API_DATA = {
     "Paracetamol": {"ka": 2.1, "ke": 0.28, "vd": 0.9, "f": 0.88},
     "Atorvastatin": {"ka": 0.8, "ke": 0.05, "vd": 5.2, "f": 0.12},
     "Metformin": {"ka": 1.1, "ke": 0.15, "vd": 1.5, "f": 0.55},
+    "Amoxicillin": {"ka": 1.5, "ke": 0.45, "vd": 0.3, "f": 0.90},
+    "Ibuprofen": {"ka": 2.5, "ke": 0.35, "vd": 0.1, "f": 0.95},
+    "Ciprofloxacin": {"ka": 1.2, "ke": 0.2, "vd": 2.5, "f": 0.70},
+    "Gliclazide": {"ka": 0.5, "ke": 0.08, "vd": 0.2, "f": 0.85},
+    "Omeprazole": {"ka": 1.8, "ke": 0.6, "vd": 0.3, "f": 0.40},
     "Custom": {"ka": 1.0, "ke": 0.1, "vd": 1.0, "f": 0.7}
 }
 
+# --- قاعدة بيانات المواد المضافة لكل صورة صيدلانية ---
 EXCIPIENTS = {
-    "Tablets/Capsules": ["Lactose", "Starch", "Mg Stearate", "Talc", "MCC", "PVP", "Crospovidone"],
-    "Gelatin Capsules": ["Gelatin", "Glycerin", "Sorbitol", "Titanium Dioxide", "Water"],
-    "Syrup/Liquids": ["Sucrose", "Glycerin", "Propylene Glycol", "Xanthan Gum", "Sodium Benzoate"],
-    "Ampoules/Vials": ["WFI", "Sodium Chloride", "Benzyl Alcohol", "Phosphate Buffer"],
-    "Nano/Advanced": ["Chitosan", "PLGA", "Phospholipids", "PEG", "Gold NPs", "Silica"]
+    "Tablets (أقراص)": ["Lactose", "Starch", "Mg Stearate", "Talc", "MCC", "PVP", "Crospovidone", "HPMC"],
+    "Capsules (كبسولات)": ["Lactose", "Starch", "Mg Stearate", "Sodium Lauryl Sulfate", "Silica"],
+    "Gelatin Cap (جيلاتين)": ["Gelatin", "Glycerin", "Sorbitol", "Titanium Dioxide", "Water", "Methylparaben"],
+    "Syrup (شراب)": ["Sucrose", "Glycerin", "Propylene Glycol", "Xanthan Gum", "Sodium Benzoate", "Flavoring"],
+    "Ampoule (أمبول)": ["WFI", "Sodium Chloride", "Benzyl Alcohol", "Phosphate Buffer", "Hydrochloric Acid"],
+    "Nano (نانو)": ["Chitosan", "PLGA", "Phospholipids", "PEG", "Gold NPs", "Silica", "Poloxamer"],
+    "Suspension (معلق)": ["CMC", "Avicel", "Simethicone", "Saccharin Sodium", "Polysorbate 80"]
 }
 
+# --- المكتبة والمنظمات ---
 REGULATORY_REFS = {
     "FDA - CDER": "https://www.fda.gov/drugs/guidances-drugs/bioequivalence-recommendations-specific-products",
     "EMA - Guidelines": "https://www.ema.europa.eu/en/human-regulatory/research-development/bioequivalence",
     "WHO - Standards": "https://extranet.who.int/pqweb/medicines",
-    "ICH - M13A": "https://www.ich.org/page/multidisciplinary-guidelines"
+    "ICH - M13A": "https://www.ich.org/page/multidisciplinary-guidelines",
+    "SFDA - Saudi Food & Drug": "https://www.sfda.gov.sa/en/drugs-guidelines",
+    "USP-NF Database": "https://www.usp.org/usp-nf"
 }
 
 # --- القائمة الجانبية (Sidebar) ---
 with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/3022/3022243.png", width=80)
-    st.header("⚙️ إعدادات الدراسة In-Vivo")
+    st.markdown("<div class='sidebar-header'>⚙️ إعدادات الدراسة In-Vivo</div>", unsafe_allow_html=True)
     
-    api_choice = st.selectbox("المادة الفعالة (API)", list(API_DATA.keys()))
-    user_dose = st.number_input("الجرعة المستخدمة (mg)", value=500.0)
+    api_choice = st.selectbox("اختر المادة الفعالة (API)", list(API_DATA.keys()))
+    user_dose = st.number_input("الجرعة الكلية (mg)", value=500.0)
     
     st.divider()
-    st.subheader("👥 بيانات الكائن المستخدم")
+    st.markdown("<div class='sidebar-header'>👥 بيانات الكائن المستخدم</div>", unsafe_allow_html=True)
     subject = st.selectbox("نوع الكائن", ["Human (إنسان)", "Animal (Beagle Dog)", "Animal (Rat)", "Animal (Rabbit)"])
     weight = st.number_input("وزن الكائن (kg)", value=70.0 if "Human" in subject else 10.0)
     food_status = st.radio("الحالة الغذائية", ["صائم (Fasted)", "فاطر (Fed)"], horizontal=True)
@@ -85,44 +97,41 @@ tab_calc, tab_refs = st.tabs(["📊 التحليل والمقارنة الثلا
 
 with tab_refs:
     st.subheader("📚 المنظمات والمراجع العالمية المعتمدة")
-    for name, url in REGULATORY_REFS.items():
-        st.markdown(f"🔗 [{name}]({url}) - دليل إرشادات التكافؤ الحيوي والدراسات السريرية.")
-    st.info("تم تحديث المكتبة لتشمل معايير ICH M13A لضمان قبول النتائج دولياً.")
+    col_r1, col_r2 = st.columns(2)
+    with col_r1:
+        for name, url in list(REGULATORY_REFS.items())[:3]:
+            st.markdown(f"🔗 [{name}]({url})")
+    with col_r2:
+        for name, url in list(REGULATORY_REFS.items())[3:]:
+            st.markdown(f"🔗 [{name}]({url})")
+    st.info("تم تحديث المكتبة لتشمل معايير ICH M13A و SFDA لضمان قبول النتائج محلياً ودولياً.")
 
 with tab_calc:
-    col_ref, col_space = st.columns([1, 0.05]) # مسافة بسيطة بين المرجع والاختبار
-    
-    with col_ref:
-        st.markdown("<div class='reference-section'>", unsafe_allow_html=True)
-        st.subheader("🚩 الدواء المرجعي العالمي (RLD)")
-        ref_name = st.text_input("اسم الدواء المرجعي", "Innovator Standard")
-        r_cmax = st.number_input("Cmax المرجع (Target)", value=12.5)
-        r_tmax = st.number_input("Tmax المرجع (Target)", value=1.5)
-        r_auc = st.number_input("AUC المرجع (Target)", value=85.0)
-        st.markdown("</div>", unsafe_allow_html=True)
+    # إعدادات الدواء المرجعي
+    st.markdown("<div class='reference-section'>", unsafe_allow_html=True)
+    st.subheader("🚩 الدواء المرجعي العالمي (RLD)")
+    c_r1, c_r2, c_r3, c_r4 = st.columns(4)
+    ref_name = c_r1.text_input("اسم الدواء المرجعي", "Reference Product")
+    r_cmax = c_r2.number_input("Cmax المرجع", value=12.5)
+    r_tmax = c_r3.number_input("Tmax المرجع", value=1.5)
+    r_auc = c_r4.number_input("AUC المرجع", value=85.0)
+    st.markdown("</div>", unsafe_allow_html=True)
 
-    st.subheader("🧪 تركيبات الاختبار المختبرة (3 Formulations)")
+    st.subheader("🧪 تركيبات الاختبار الثلاثة (Test Formulations)")
     t_cols = st.columns(3)
     formulations = []
 
     for i in range(3):
         with t_cols[i]:
             st.markdown(f"<div class='test-box'>", unsafe_allow_html=True)
-            st.markdown(f"**التركيبة {i+1}**")
-            f_name = st.text_input(f"الاسم", f"Sama-Formula-{i+1}", key=f"n{i}")
-            f_type = st.selectbox(f"الصورة الصيدلانية", ["Tablets", "Capsules", "Gelatin Cap", "Syrup", "Ampoule", "Nano"], key=f"t{i}")
+            st.markdown(f"**التركيبة المختبرة {i+1}**")
+            f_name = st.text_input(f"اسم التركيبة", f"Formulation-{i+1}", key=f"n{i}")
+            f_type = st.selectbox(f"الصورة الصيدلانية", list(EXCIPIENTS.keys()), key=f"t{i}")
             
-            # تحديد قائمة الإضافات بناء على الصورة الصيدلانية
-            if f_type == "Nano": exc_cat = "Nano/Advanced"
-            elif f_type in ["Syrup"]: exc_cat = "Syrup/Liquids"
-            elif f_type == "Ampoule": exc_cat = "Ampoules/Vials"
-            elif f_type == "Gelatin Cap": exc_cat = "Gelatin Capsules"
-            else: exc_cat = "Tablets/Capsules"
-            
-            selected_excs = st.multiselect("المواد المضافة", EXCIPIENTS[exc_cat], key=f"e{i}")
+            selected_excs = st.multiselect("المواد المضافة", EXCIPIENTS[f_type], key=f"e{i}")
             
             p_size = 0
-            if f_type == "Nano":
+            if "Nano" in f_type:
                 p_size = st.number_input("حجم الجسيمات (nm)", value=150, key=f"p{i}")
             
             formulations.append({"name": f_name, "type": f_type, "excs": selected_excs, "psize": p_size})
@@ -132,30 +141,35 @@ with tab_calc:
         t_points = np.linspace(0, 24, 300)
         base_p = API_DATA[api_choice]
         
+        # تأثير الحالة الغذائية
+        f_status = 0.80 if food_status == "فاطر (Fed)" else 1.0
+        
         # 1. محاكاة المرجع (RLD)
-        # تعديل العوامل بناء على الحالة الغذائية
-        f_status = 0.85 if food_status == "فاطر (Fed)" else 1.0
         y_ref = pk_model(t_points, user_dose, base_p['f'] * f_status, base_p['ka'], base_p['ke'], base_p['vd'], weight)
-        # تطبيع المنحنى ليناسب مدخلات المستخدم للمرجع
         if np.max(y_ref) > 0: y_ref = y_ref * (r_cmax / np.max(y_ref))
         
         sim_results = {"Time": t_points, "Reference": y_ref}
         metrics = {"Reference": {"cmax": np.max(y_ref), "tmax": t_points[np.argmax(y_ref)], "auc": safe_auc(y_ref, t_points)}}
         
-        # 2. محاكاة التركيبات الثلاث
+        # 2. محاكاة تركيبات الاختبار
         for f in formulations:
-            # تأثير الصورة الصيدلانية والنانو على الامتصاص
-            ka_mod = 2.8 if f['type'] == "Nano" else (1.6 if f['type'] in ["Syrup", "Ampoule"] else 1.0)
-            f_mod = 1.3 if f['type'] == "Nano" else 1.0
+            # تعديل العوامل بناء على الصورة الصيدلانية
+            ka_mod = 1.0
+            f_mod = 1.0
             
-            # تأثير حجم الجسيمات في حالة النانو
-            if f['type'] == "Nano" and f['psize'] < 100:
-                ka_mod *= 1.2
-                f_mod *= 1.1
-                
+            if "Nano" in f['type']:
+                ka_mod = 3.0
+                f_mod = 1.4
+                if f['psize'] < 100: ka_mod *= 1.3 # جزيئات أصغر = امتصاص أسرع
+            elif "Syrup" in f['type'] or "Ampoule" in f['type']:
+                ka_mod = 1.8
+                f_mod = 1.1
+            elif "Gelatin" in f['type']:
+                ka_mod = 1.2
+            
             y_test = pk_model(t_points, user_dose, base_p['f'] * f_mod * f_status, base_p['ka'] * ka_mod, base_p['ke'], base_p['vd'], weight)
-            # إضافة تباين عشوائي بسيط للمحاكاة (In-Vivo Variation)
-            y_test *= np.random.normal(1.0, 0.02, len(t_points))
+            # تباين In-Vivo
+            y_test *= np.random.normal(1.0, 0.03, len(t_points))
             
             sim_results[f['name']] = y_test
             metrics[f['name']] = {
@@ -164,25 +178,26 @@ with tab_calc:
                 "auc": safe_auc(y_test, t_points)
             }
 
-        # --- عرض النتائج ---
+        # --- عرض النتائج المتقدمة ---
         st.divider()
         res_col1, res_col2 = st.columns([2, 1])
         
         with res_col1:
             fig, ax = plt.subplots(figsize=(10, 5))
-            ax.plot(t_points, y_ref, label=f"المرجع: {ref_name}", linewidth=4, color='black', linestyle='--')
-            for f in formulations:
-                ax.plot(t_points, sim_results[f['name']], label=f"اختبار: {f['name']}", linewidth=2.5)
+            ax.plot(t_points, y_ref, label=f"المرجع: {ref_name}", linewidth=4, color='#1e293b', linestyle='--')
+            colors = ['#00a8cc', '#ff6b6b', '#51cf66']
+            for idx, f in enumerate(formulations):
+                ax.plot(t_points, sim_results[f['name']], label=f"اختبار: {f['name']}", linewidth=2.5, color=colors[idx])
             
-            ax.set_title("In-Vivo Comparative Bioavailability Profile")
+            ax.set_title(f"In-Vivo PK Profile: {subject} ({food_status})")
             ax.set_xlabel("Time (hours)")
-            ax.set_ylabel("Plasma Conc (µg/mL)")
+            ax.set_ylabel("Concentration (µg/mL)")
             ax.legend()
-            ax.grid(True, alpha=0.2)
+            ax.grid(True, alpha=0.15)
             st.pyplot(fig)
             
         with res_col2:
-            st.subheader("📏 المقاييس الحيوية (In-Vivo Results)")
+            st.subheader("📏 المقاييس الحيوية (PK Results)")
             for name, m in metrics.items():
                 with st.expander(f"بيانات {name}", expanded=True):
                     c1, c2, c3 = st.columns(3)
@@ -193,9 +208,9 @@ with tab_calc:
                     if name != "Reference":
                         ratio = (m['auc'] / metrics["Reference"]['auc']) * 100 if metrics["Reference"]['auc'] > 0 else 0
                         status = "✅ Pass" if 80 <= ratio <= 125 else "❌ Fail"
-                        st.write(f"**نسبة التكافؤ:** {ratio:.1f}% | **النتيجة:** {status}")
+                        st.write(f"**Bioequivalence Ratio:** {ratio:.1f}% | {status}")
 
-        st.subheader("📝 تقرير التركيبات والمواد المضافة")
+        st.subheader("📝 التقرير الفني للتركيبات")
         report_data = []
         for f in formulations:
             m = metrics[f['name']]
@@ -203,13 +218,13 @@ with tab_calc:
                 "اسم التركيبة": f['name'],
                 "الصورة الصيدلانية": f['type'],
                 "المواد المضافة": ", ".join(f['excs']),
-                "حجم الجسيمات (نانو)": f"{f['psize']} nm" if f['psize'] > 0 else "N/A",
-                "Cmax/Ref %": f"{(m['cmax']/metrics['Reference']['cmax'])*100:.1f}%"
+                "حجم الجسيمات": f"{f['psize']} nm" if f['psize'] > 0 else "N/A",
+                "Cmax Relative": f"{(m['cmax']/metrics['Reference']['cmax'])*100:.1f}%",
+                "AUC Relative": f"{(m['auc']/metrics['Reference']['auc'])*100:.1f}%"
             })
         st.table(pd.DataFrame(report_data))
         
-        # تحميل البيانات
         csv = pd.DataFrame(sim_results).to_csv(index=False)
-        st.download_button("📂 تحميل التقرير الكامل (CSV)", csv, "bioequivalence_full_report.csv", "text/csv")
+        st.download_button("📂 تحميل التقرير التفصيلي (CSV)", csv, "precision_be_study.csv", "text/csv")
 
 st.markdown("<br><hr><center>Sama Pharma Tech | وحدة أبحاث التكافؤ الحيوي المتطورة</center>", unsafe_allow_html=True)
