@@ -84,12 +84,12 @@ def generate_pk_data(t, dose, f, ka, ke, vd):
     return np.maximum(0, conc)
 
 def get_auc(conc, time):
-    """حساب المساحة تحت المنحنى بدقة عالية"""
+    """حساب المساحة تحت المنحنى بدقة عالية مع معالجة توافق NumPy"""
     try:
-        # الإصدارات الحديثة من numpy تستخدم trapezoid
+        # المحاولة باستخدام الاسم الجديد في NumPy 2.x
         return np.trapezoid(conc, time)
     except AttributeError:
-        # التوافق مع الإصدارات الأقدم
+        # العودة للاسم القديم في الإصدارات السابقة
         return np.trapz(conc, time)
 
 # --- واجهة المستخدم الرئيسية ---
@@ -271,4 +271,4 @@ else:
     st.info("💡 للبدء: قم بإدخال بيانات التركيبات في التبويب الأول واضغط على زر 'تشغيل التحليل'.")
 
 st.divider()
-st.caption("Developed by Sama Pharma Tech | Precision Research & Development Hub v5.0")
+st.caption("Developed by Sama Pharma Tech | R&D Excellence Hub v5.0")
