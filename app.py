@@ -69,7 +69,13 @@ PHARMA_DATA = {
         "Rats (Wistar/SD)",
         "Mice",
         "Mini-Pigs"
-    ]
+    ],
+    "drug_specific_refs": {
+        "Paracetamol": "https://www.accessdata.fda.gov/scripts/cder/ob/results_product.cfm?Appl_Type=N&Appl_No=006456",
+        "Atorvastatin": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2009/020702s057lbl.pdf",
+        "Metformin": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2017/020357s037s039lbl.pdf",
+        "Ibuprofen": "https://www.accessdata.fda.gov/scripts/cder/ob/results_product.cfm?Appl_Type=N&Appl_No=017463"
+    }
 }
 
 # --- Global Regulatory & Research Library ---
@@ -119,9 +125,16 @@ with tab_setup:
     col_main1, col_main2 = st.columns(2)
     with col_main1:
         st.subheader("📝 تفاصيل الدواء المرجعي (RLD)")
-        api_name = st.text_input("اسم المادة الفعالة (API)", "Paracetamol")
-        ref_drug = st.text_input("الدواء العالمي المرجعي", "Panadol® (Reference)")
+        api_name = st.selectbox("اختر المادة الفعالة (API)", list(PHARMA_DATA["drug_specific_refs"].keys()) + ["Custom"])
+        if api_name == "Custom":
+            api_name = st.text_input("اسم المادة المخصصة", "MyAPI")
+            
+        ref_drug = st.text_input("اسم الدواء العالمي المرجعي", "Reference Innovator®")
         total_dose = st.number_input("الجرعة الكلية (mg)", value=500.0, step=50.0)
+        
+        # Reference drug specific reference link
+        ref_url = PHARMA_DATA["drug_specific_refs"].get(api_name, "https://www.accessdata.fda.gov/scripts/cder/ob/default.cfm")
+        st.markdown(f"🔗 [رابط مرجع الدواء المرجعي (FDA/EMA)]({ref_url})")
         
     with col_main2:
         st.subheader("👥 نموذج الدراسة (Study Model)")
