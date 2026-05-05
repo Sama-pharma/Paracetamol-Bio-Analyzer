@@ -22,6 +22,7 @@ st.markdown("""
     .metric-label { color: #64748b; font-size: 0.9rem; font-weight: bold; margin-bottom: 2px; }
     .metric-value { color: #1e293b; font-size: 1.2rem; font-weight: 800; }
     .nano-badge { background-color: #eff6ff; color: #1e40af; padding: 4px 12px; border-radius: 8px; font-size: 0.8rem; font-weight: bold; }
+    .reference-section { border: 2px solid #1e3a8a; background-color: #f0f4ff; border-radius: 10px; padding: 10px; margin-bottom: 15px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -163,21 +164,20 @@ if run_analysis:
         
         # منطق تأثير الأشكال الصيدلانية
         if "نانو" in data['form']:
-            # جسيمات أصغر = امتصاص أسرع وتوافر أعلى بكثير
             f_val = 0.98 if data['particle_size'] < 100 else 0.88
             ka_val = 5.0 if data['particle_size'] < 100 else 3.5
         elif "حقن" in data['form']:
             f_val = 1.0
-            ka_val = 15.0 # امتصاص شبه فوري
+            ka_val = 15.0 
         elif "SR" in data['form']:
             f_val = 0.80
-            ka_val = 0.2 # امتصاص بطيء جداً
+            ka_val = 0.2 
         elif "شراب" in data['form']:
             ka_val = 2.5
             
         test_conc = generate_pk_data(t_points, total_dose, f_val, ka_val, ke, Vd)
         
-        # إضافة تباين إحصائي (Inter-subject variability)
+        # إضافة تباين إحصائي
         noise = (0.12 / np.sqrt(num_subjects)) 
         test_conc = test_conc * np.random.normal(1, noise, len(t_points))
         results[name] = np.maximum(0, test_conc)
@@ -212,18 +212,35 @@ if st.session_state.df_results is not None:
             
         with col_metrics:
             st.markdown("### 🎯 المقاييس الحيوية (PK Parameters)")
-            auc_ref = get_auc(df.iloc[:, 1], df['Time'])
             
+            # حساب وعرض نتائج الدواء المرجعي أولاً
+            ref_col = df.columns[1] # Reference (RLD)
+            cmax_ref = df[ref_col].max()
+            tmax_ref = df.iloc[df[ref_col].idxmax()]['Time']
+            auc_ref = get_auc(df[ref_col], df['Time'])
+            
+            st.markdown(f"<div class='reference-section'>", unsafe_allow_html=True)
+            st.markdown(f"**🏅 الدواء المرجعي: {ref_drug}**")
+            rm1, rm2, rm3 = st.columns(3)
+            rm1.markdown(f"<p class='metric-label'>Cmax</p><p class='metric-value'>{cmax_ref:.2f}</p>", unsafe_allow_html=True)
+            rm2.markdown(f"<p class='metric-label'>Tmax (h)</p><p class='metric-value'>{tmax_ref:.1f}</p>", unsafe_allow_html=True)
+            rm3.markdown(f"<p class='metric-label'>AUC</p><p class='metric-value'>{auc_ref:.1f}</p>", unsafe_allow_html=True)
+            st.markdown("</div>", unsafe_allow_html=True)
+            
+            st.divider()
+            
+            # عرض نتائج التركيبات المختبرة والمقارنة
             for col in df.columns[2:]:
-                cmax = df[col].max()
-                tmax = df.iloc[df[col].idxmax()]['Time']
+                cmax_test = df[col].max()
+                tmax_test = df.iloc[df[col].idxmax()]['Time']
                 auc_test = get_auc(df[col], df['Time'])
                 be_ratio = (auc_test / auc_ref) * 100
                 
                 with st.expander(f"التحليل التفصيلي: {col}", expanded=True):
-                    m1, m2 = st.columns(2)
-                    m1.markdown(f"<p class='metric-label'>Cmax</p><p class='metric-value'>{cmax:.2f}</p>", unsafe_allow_html=True)
-                    m2.markdown(f"<p class='metric-label'>Tmax (h)</p><p class='metric-value'>{tmax:.1f}</p>", unsafe_allow_html=True)
+                    m1, m2, m3 = st.columns(3)
+                    m1.markdown(f"<p class='metric-label'>Cmax</p><p class='metric-value'>{cmax_test:.2f}</p>", unsafe_allow_html=True)
+                    m2.markdown(f"<p class='metric-label'>Tmax (h)</p><p class='metric-value'>{tmax_test:.1f}</p>", unsafe_allow_html=True)
+                    m3.markdown(f"<p class='metric-label'>AUC</p><p class='metric-value'>{auc_test:.1f}</p>", unsafe_allow_html=True)
                     
                     st.write(f"**نسبة AUC المقارنة:** {be_ratio:.1f}%")
                     is_be = 80 <= be_ratio <= 125
@@ -251,6 +268,9 @@ if st.session_state.df_results is not None:
         st.write(f"**المادة الخاضعة للدراسة:** {api_name}")
         st.write(f"**الدواء المرجعي المستخدم:** {ref_drug}")
         st.write(f"**تاريخ التحليل:** 2026-05-05")
+        
+        # إضافة نتائج المرجعي للتقرير
+        st.markdown(f"**📊 نتائج الدواء المرجعي:** AUC: {auc_ref:.2f} | Cmax: {cmax_ref:.2f} | Tmax: {tmax_ref:.1f}")
         
         report_data = []
         for name, data in st.session_state.formulations.items():
