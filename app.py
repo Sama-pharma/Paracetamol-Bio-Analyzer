@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import scipy.stats as stats
 from datetime import datetime
 
 # --- إعدادات الصفحة ---
@@ -31,6 +30,15 @@ def calculate_pk_profile(t, dose, f, ka, ke, vd):
     if ka == ke: ka += 0.001
     c = (f * dose * ka / (vd * (ka - ke))) * (np.exp(-ke * t) - np.exp(-ka * t))
     return np.maximum(0, c)
+
+# إصلاح خطأ np.trapz لضمان التوافق مع نسخ NumPy القديمة والجديدة
+def get_auc(conc, time):
+    try:
+        # المحاولة باستخدام الاسم الجديد في NumPy 2.0
+        return np.trapezoid(conc, time)
+    except AttributeError:
+        # الرجوع للاسم القديم في حال كانت النسخة قديمة
+        return np.trapz(conc, time)
 
 # --- قاعدة بيانات المنظمات والأبحاث (Library Database) ---
 REGULATORY_LIBRARY = {
@@ -69,10 +77,15 @@ with st.sidebar:
     dose_mg = st.number_input("الجرعة (mg)", value=40.0)
     
     st.divider()
+    st.subheader("📦 النظام التوصيلي المستخدم")
+    delivery_system = st.selectbox("النظام التوصيلي", ["Nano-Carrier", "Solid Dispersion", "Conventional Matrix"])
+    excipient_main = st.selectbox("مادة التحميل المستخدمة", ["Solid Lipid Nanoparticles", "Chitosan", "Lactose/MCC", "PVP K30"])
+    
+    st.divider()
     st.subheader("💊 التركيبات المختبرة")
-    t1_name = st.text_input("التركيبة 1 (Nano)", "T1-NanoTech")
-    t2_name = st.text_input("التركيبة 2 (Solid)", "T2-SolidDisp")
-    t3_name = st.text_input("التركيبة 3 (Conv)", "T3-Conventional")
+    t1_name = st.text_input("التركيبة 1", "T1-NanoTech")
+    t2_name = st.text_input("التركيبة 2", "T2-SolidDisp")
+    t3_name = st.text_input("التركيبة 3", "T3-Conventional")
     
     st.divider()
     st.subheader("👥 تصميم العينة")
@@ -84,26 +97,25 @@ with st.sidebar:
 if run_btn:
     # 1. محاكاة بيانات PK (Data Generation)
     t_points = np.array([0, 0.25, 0.5, 0.75, 1, 1.5, 2, 4, 6, 8, 12, 24])
-    Vd = 0.6 * 70 # لمتوسط وزن إنسان
+    Vd = 0.6 * 70 
     ke = 0.12
     
     # محاكاة المنحنيات بخصائص مختلفة لكل تقنية
     pk_data = {
         'Time': t_points,
         'Reference': calculate_pk_profile(t_points, dose_mg, 0.62, 1.2, ke, Vd),
-        t1_name: calculate_pk_profile(t_points, dose_mg, 0.88, 3.2, ke, Vd), # Nano: High & Fast
-        t2_name: calculate_pk_profile(t_points, dose_mg, 0.75, 1.9, ke, Vd), # Solid: Moderate
-        t3_name: calculate_pk_profile(t_points, dose_mg, 0.64, 1.4, ke, Vd)  # Conv: Similar to Ref
+        t1_name: calculate_pk_profile(t_points, dose_mg, 0.88, 3.2, ke, Vd), 
+        t2_name: calculate_pk_profile(t_points, dose_mg, 0.75, 1.9, ke, Vd), 
+        t3_name: calculate_pk_profile(t_points, dose_mg, 0.64, 1.4, ke, Vd)  
     }
     
-    # إضافة ضجيج إحصائي (Intra-subject variability)
     df = pd.DataFrame(pk_data)
     for col in df.columns[1:]:
         df[col] = df[col] * np.random.normal(1, 0.04, len(t_points))
 
     with tab_comparison:
         st.markdown("<div class='section-card'>", unsafe_allow_html=True)
-        st.subheader("📈 مقارنة منحنيات تركيز البلازما (Triple Comparison)")
+        st.subheader(f"📈 مقارنة منحنيات تركيز البلازما ({delivery_system})")
         
         col_plot, col_stats = st.columns([2, 1])
         
@@ -122,13 +134,14 @@ if run_btn:
             
         with col_stats:
             st.subheader("🎯 تحليل فترات الثقة (90% CI)")
-            auc_ref = np.trapz(df['Reference'], df['Time'])
+            # استخدام الدالة المصلحة get_auc لتفادي خطأ np.trapz
+            auc_ref = get_auc(df['Reference'], df['Time'])
             
             for col in [t1_name, t2_name, t3_name]:
-                auc_test = np.trapz(df[col], df['Time'])
+                auc_test = get_auc(df[col], df['Time'])
                 ratio = (auc_test / auc_ref) * 100
                 
-                # حساب إحصائي مبسط لفترة الثقة
+                # حساب إحصائي لثبات النتائج
                 ci_low = ratio * 0.94
                 ci_high = ratio * 1.06
                 is_be = 80 <= ci_low and ci_high <= 125
@@ -143,8 +156,8 @@ if run_btn:
 
     with tab_pharma:
         st.markdown("<div class='section-card'>", unsafe_allow_html=True)
-        st.subheader("🧪 الربط الصيدلاني (In-Vitro Laboratory Results)")
-        st.info("مواصفات التصنيع ونتائج المعمل المرتبطة بالتكافؤ الحيوي.")
+        st.subheader("🧪 النتائج الصيدلانية (In-Vitro Laboratory Results)")
+        st.info(f"مواصفات التصنيع باستخدام {excipient_main} وتأثيرها على التكافؤ الحيوي.")
         
         p1, p2, p3 = st.columns(3)
         with p1:
@@ -173,11 +186,6 @@ if run_btn:
             with st.expander(f"🏛️ {org}", expanded=True):
                 for link in links:
                     st.markdown(f"🔗 <a href='{link['url']}' class='ref-link' target='_blank'>{link['title']}</a>", unsafe_allow_html=True)
-        
-        st.divider()
-        st.subheader("📑 أبحاث أكاديمية مقترحة (PubMed/Google Scholar)")
-        st.write("1. *Innovative Approaches in Nanotechnology for Bioavailability Enhancement (2025).*")
-        st.write("2. *Impact of Particle Size on the PK Profiles of BCS Class II APIs.*")
         st.markdown("</div>", unsafe_allow_html=True)
 
     with tab_report:
@@ -189,11 +197,12 @@ if run_btn:
         ---
         - **اسم المستحضر:** {api_name}
         - **تاريخ التحليل:** {datetime.now().strftime('%Y-%m-%d')}
+        - **النظام المستخدم:** {delivery_system} ({excipient_main})
         - **تصميم الدراسة:** {study_design} (N={subjects_count})
         
         **الاستنتاج العلمي:**
-        تمت مقارنة ثلاث تركيبات تقنية. أظهرت التركيبة **({t1_name})** زيادة ملحوظة في التوافر الحيوي بنسبة {((np.trapz(df[t1_name], df['Time'])/auc_ref)-1)*100:.1f}% 
-        مقارنة بالمرجع، بينما وقعت التركيبة **({t3_name})** ضمن نطاق التكافؤ المعتمد دولياً (80-125%).
+        تمت مقارنة ثلاث تركيبات تقنية. أظهرت التركيبة **({t1_name})** زيادة ملحوظة في التوافر الحيوي، 
+        بينما وقعت التركيبة **({t3_name})** ضمن نطاق التكافؤ المعتمد دولياً (80-125%).
         """
         st.markdown(report_txt)
         st.download_button("📥 تحميل النتائج (Excel/CSV)", df.to_csv(), "Sama_Bio_Study.csv")
