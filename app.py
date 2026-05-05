@@ -3,14 +3,14 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-# --- إعدادات الصفحة ---
+# --- Page Configuration ---
 st.set_page_config(
     page_title="Sama Pharma Tech | Global Bioequivalence Hub",
     page_icon="🧬",
     layout="wide"
 )
 
-# --- التنسيق البصري (CSS) المطور ---
+# --- Enhanced Visual Styling (CSS) ---
 st.markdown("""
     <style>
     .stApp { background-color: #f4f7f9; }
@@ -22,13 +22,14 @@ st.markdown("""
     .metric-label { color: #64748b; font-size: 0.9rem; font-weight: bold; margin-bottom: 2px; }
     .metric-value { color: #1e293b; font-size: 1.2rem; font-weight: 800; }
     .nano-badge { background-color: #eff6ff; color: #1e40af; padding: 4px 12px; border-radius: 8px; font-size: 0.8rem; font-weight: bold; }
-    .reference-section { border: 2px solid #1e3a8a; background-color: #f0f4ff; border-radius: 10px; padding: 10px; margin-bottom: 15px; }
+    .reference-section { border: 2px solid #1e3a8a; background-color: #f0f4ff; border-radius: 10px; padding: 15px; margin-bottom: 15px; }
+    .animal-tag { background: #fef3c7; color: #92400e; padding: 2px 10px; border-radius: 5px; font-size: 0.85rem; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- قاعدة بيانات شاملة للمواد المضافة والأشكال الصيدلانية ---
+# --- Comprehensive Pharmaceutical Database ---
 PHARMA_DATA = {
-    "الأشكال الصيدلانية": [
+    "dosage_forms": [
         "أقراص (Tablets)", 
         "كبسولات جيلاتينية صلبة", 
         "كبسولات جيلاتينية رخوة (Softgels)", 
@@ -37,161 +38,165 @@ PHARMA_DATA = {
         "حقن (Ampoules/Vials)", 
         "نانو (Nano-Formulation)", 
         "أقراص ممتدة المفعول (SR/ER)",
-        "جيل (Gel/Topical)"
+        "جيل (Gel/Topical)",
+        "لبوس (Suppositories)"
     ],
-    "المواد المضافة": {
-        "الصلبة (أقراص/كبسولات)": [
+    "excipients": {
+        "أقراص/كبسولات": [
             "Lactose Monohydrate", "Microcrystalline Cellulose (MCC)", "Magnesium Stearate", 
-            "PVP K30", "Crospovidone", "HPMC", "Starch", "Talc", "Colloidal Silicon Dioxide"
+            "PVP K30", "Crospovidone", "HPMC", "Starch", "Talc", "Colloidal Silicon Dioxide",
+            "Sodium Starch Glycolate", "Stearic Acid", "Ethyl Cellulose"
         ],
-        "السائلة (شراب/معلق)": [
+        "شراب/معلق": [
             "Glycerin", "Xanthan Gum", "Tween 80 (Polysorbate)", "Sorbitol", 
-            "Sodium Benzoate", "Sucrose", "Propylene Glycol", "CMC-Na"
+            "Sodium Benzoate", "Sucrose", "Propylene Glycol", "CMC-Na", "Aspartame",
+            "Citric Acid", "Methylparaben"
         ],
-        "الحقن (Injectables)": [
+        "حقن": [
             "Saline (0.9% NaCl)", "PEG 400", "Polysorbate 80", "Ethanol", 
-            "Phosphate Buffer", "Water for Injection", "Benzyl Alcohol"
+            "Phosphate Buffer", "Water for Injection", "Benzyl Alcohol", "Dextrose"
         ],
-        "النانو (Nano-Carriers)": [
+        "نانو": [
             "Chitosan Nanoparticles", "PLGA Polymers", "Phospholipids (Liposomes)", 
             "PEGylated Lipids", "Solid Lipid Nanoparticles (SLN)", "Gold Nanoparticles", 
-            "Mesoporous Silica", "Albumin Nanoparticles"
+            "Mesoporous Silica", "Albumin Nanoparticles", "Poloxamer 188", "DOPC"
         ]
-    }
+    },
+    "animal_models": ["Rats (Wistar/SD)", "Mice", "Rabbits (New Zealand)", "Beagle Dogs", "Mini-Pigs"]
 }
 
-# --- مكتبة المراجع والمنظمات العالمية المحدثة 2024-2025 ---
+# --- Global Regulatory & Research Library ---
 REGULATORY_LIBRARY = {
-    "الهيئات الرقابية الدولية (Regulatory Bodies)": [
-        {"title": "FDA - Orange Book: Approved Drug Products", "url": "https://www.accessdata.fda.gov/scripts/cder/ob/index.cfm"},
-        {"title": "EMA - Clinical Pharmacology Guidelines", "url": "https://www.ema.europa.eu/en/human-regulatory/research-development/scientific-guidelines/clinical-pharmacology-pharmacokinetics"},
-        {"title": "WHO - Guidance on Bioequivalence Studies (TRS 1003)", "url": "https://www.who.int/medicines/publications/pharmprep/WHO_TRS_1003_Annex6.pdf"},
-        {"title": "ICH M13A - International Bioequivalence Standard 2024", "url": "https://database.ich.org/sites/default/files/ICH_M13A_Step4_Guideline_2024_0611.pdf"}
+    "المنظمات والهيئات الرقابية (Regulatory Authorities)": [
+        {"title": "FDA - Center for Drug Evaluation and Research (CDER)", "url": "https://www.fda.gov/about-fda/center-drug-evaluation-and-research-cder"},
+        {"title": "EMA - Guideline on the Investigation of Bioequivalence", "url": "https://www.ema.europa.eu/en/investigation-bioequivalence-scientific-guideline"},
+        {"title": "WHO - Prequalification of Medicines Programme", "url": "https://extranet.who.int/pqweb/medicines"},
+        {"title": "SFDA - Saudi Food and Drug Authority BE Guidelines", "url": "https://www.sfda.gov.sa/en/regulations?tags=8"},
+        {"title": "ICH M13A - Bioequivalence Standards (2024-2025)", "url": "https://www.ich.org/page/multidisciplinary-guidelines"}
     ],
-    "المكتبات البحثية (Scientific Databases)": [
-        {"title": "PubMed: Bioavailability & Nano-tech Research", "url": "https://pubmed.ncbi.nlm.nih.gov/"},
-        {"title": "ScienceDirect: Advanced Drug Delivery Reviews", "url": "https://www.sciencedirect.com/journal/advanced-drug-delivery-reviews"},
-        {"title": "Google Scholar: Comparative BE Studies 2025", "url": "https://scholar.google.com/"},
-        {"title": "Journal of Controlled Release: Nano-Bio Systems", "url": "https://www.journals.elsevier.com/journal-of-controlled-release"}
+    "المكتبات البحثية التخصصية (Scientific Research)": [
+        {"title": "PubMed - Bioavailability & Bioequivalence Research", "url": "https://pubmed.ncbi.nlm.nih.gov/?term=bioequivalence"},
+        {"title": "ScienceDirect - Journal of Controlled Release", "url": "https://www.sciencedirect.com/journal/journal-of-controlled-release"},
+        {"title": "Google Scholar - Advanced Drug Delivery Reviews", "url": "https://scholar.google.com/"},
+        {"title": "AAPS Journal - Pharmaceutical Sciences Research", "url": "https://www.aaps.org/publications/aaps-journals"}
     ]
 }
 
-# --- محرك المحاكاة العلمي المطور ---
+# --- Scientific Simulation Engine ---
 def generate_pk_data(t, dose, f, ka, ke, vd):
-    """حساب منحنى تركيز البلازما باستخدام نموذج الغرفة الواحدة"""
+    """Calculates Plasma Concentration using One-Compartment Open Model."""
     if abs(ka - ke) < 0.001: ka += 0.01
-    # معادلة التركيز القياسية
     conc = (f * dose * ka / (vd * (ka - ke))) * (np.exp(-ke * t) - np.exp(-ka * t))
     return np.maximum(0, conc)
 
 def get_auc(conc, time):
-    """حساب المساحة تحت المنحنى بدقة عالية مع معالجة توافق NumPy"""
+    """Calculates Area Under the Curve (AUC) using Trapezoidal Rule."""
     try:
-        # المحاولة باستخدام الاسم الجديد في NumPy 2.x
         return np.trapezoid(conc, time)
     except AttributeError:
-        # العودة للاسم القديم في الإصدارات السابقة
         return np.trapz(conc, time)
 
-# --- واجهة المستخدم الرئيسية ---
-st.markdown("<h1 class='main-header'>🧬 Sama Pharma Tech | Precision Bioequivalence Hub</h1>", unsafe_allow_html=True)
+# --- UI Header ---
+st.markdown("<h1 class='main-header'>🧬 Sama Pharma Tech | Bioequivalence Precision Hub</h1>", unsafe_allow_html=True)
 
 tab_setup, tab_analysis, tab_library, tab_report = st.tabs([
-    "⚙️ إعدادات الدراسة والتركيبات", 
-    "📊 مقارنة النتائج (In-Vivo)", 
-    "📚 المكتبة المرجعية والأبحاث",
-    "📄 تقارير الجودة والنتائج"
+    "⚙️ إعدادات الدراسة", 
+    "📊 تحليل النتائج (In-Vivo)", 
+    "📚 المكتبة العلمية والمراجع",
+    "📄 التقارير النهائية"
 ])
 
 with tab_setup:
     col_main1, col_main2 = st.columns(2)
     with col_main1:
-        st.subheader("📝 تفاصيل الدواء المرجعي")
+        st.subheader("📝 تفاصيل الدواء المرجعي (RLD)")
         api_name = st.text_input("اسم المادة الفعالة (API)", "Paracetamol")
-        ref_drug = st.text_input("الدواء العالمي المرجعي (RLD)", "Panadol® (Reference)")
-        total_dose = st.number_input("الجرعة الكلية (mg)", value=500.0, step=50.0)
+        ref_drug = st.text_input("الدواء العالمي المرجعي", "Panadol® (Reference)")
+        total_dose = st.number_input("الجرعة (mg)", value=500.0, step=50.0)
         
     with col_main2:
-        st.subheader("👥 معايير الدراسة الإحصائية")
-        num_subjects = st.slider("عدد المتطوعين في الدراسة (N)", 12, 120, 24)
-        study_design = st.selectbox("تصميم الدراسة", ["Crossover (2x2)", "Parallel", "Replicate Design"])
+        st.subheader("🐀 بروتوكول الدراسة (In-Vivo Protocol)")
+        animal_type = st.selectbox("نوع الحيوان المستخدم", PHARMA_DATA["animal_models"])
+        feeding_status = st.radio("الحالة الغذائية", ["صائم (Fasted)", "فاطر (Fed)"], horizontal=True)
+        num_subjects = st.slider("عدد العينات (N)", 6, 60, 12)
 
     st.divider()
-    st.subheader("🧪 تخصيص المقارنة الثلاثية (Comparative Formulation Lab)")
+    st.subheader("🧪 تخصيص التركيبات المختبرة (Triple Comparison)")
     
     t_cols = st.columns(3)
     formulations = {}
     
     for i, col in enumerate(t_cols, 1):
         with col:
-            st.markdown(f"### 🧪 التركيبة {i}")
-            name = st.text_input(f"اسم المنتج {i}", f"Test-Formula-{i}", key=f"name_{i}")
-            form = st.selectbox(f"الصورة الصيدلانية {i}", PHARMA_DATA["الأشكال الصيدلانية"], key=f"form_{i}")
+            st.markdown(f"### 🧪 تركيبة مختبرة {i}")
+            name = st.text_input(f"اسم المنتج {i}", f"Sama-Formula-{i}", key=f"name_{i}")
+            form = st.selectbox(f"الصورة الصيدلانية {i}", PHARMA_DATA["dosage_forms"], key=f"form_{i}")
             
-            # اختيار فئة المواد المضافة بناء على الشكل
-            if "نانو" in form: exc_cat = "النانو (Nano-Carriers)"
-            elif "حقن" in form: exc_cat = "الحقن (Injectables)"
-            elif "شراب" in form or "معلق" in form: exc_cat = "السائلة (شراب/معلق)"
-            else: exc_cat = "الصلبة (أقراص/كبسولات)"
+            # Map excipients based on form
+            if "نانو" in form: exc_cat = "نانو"
+            elif "حقن" in form: exc_cat = "حقن"
+            elif "شراب" in form or "معلق" in form: exc_cat = "شراب/معلق"
+            else: exc_cat = "أقراص/كبسولات"
             
-            selected_excs = st.multiselect(f"المواد المضافة {i}", PHARMA_DATA["المواد المضافة"][exc_cat], key=f"excs_{i}")
+            selected_excs = st.multiselect(f"المواد المضافة {i}", PHARMA_DATA["excipients"][exc_cat], key=f"excs_{i}")
             
             p_size = 0
             if "نانو" in form:
-                p_size = st.number_input(f"حجم الجسيمات (nm) - {i}", value=150, help="الحجم يؤثر على سرعة الامتصاص و Cmax", key=f"ps_{i}")
-                st.markdown(f"<span class='nano-badge'>تقنية النانو نشطة: {p_size} nm</span>", unsafe_allow_html=True)
+                p_size = st.number_input(f"حجم الجسيمات (nm) - {i}", value=120, key=f"ps_{i}")
+                st.markdown(f"<span class='nano-badge'>تكنولوجيا النانو مفعلة: {p_size} nm</span>", unsafe_allow_html=True)
             
             formulations[name] = {"form": form, "excipients": selected_excs, "particle_size": p_size}
 
-    run_analysis = st.button("🚀 تشغيل تحليل التكافؤ الحيوي والمقارنة الثلاثية")
+    run_analysis = st.button("🚀 تشغيل تحليل التكافؤ الحيوي الشامل")
 
 if "df_results" not in st.session_state:
     st.session_state.df_results = None
 
 if run_analysis:
-    # نقاط زمنية مكثفة لتحسين الرسم البياني
-    t_points = np.array([0, 0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4, 6, 8, 10, 12, 18, 24])
-    Vd = 0.7 * 70  # حجم التوزيع الافتراضي (L)
-    ke = 0.15      # ثابت الإخراج (1/h)
+    t_points = np.array([0, 0.25, 0.5, 1, 1.5, 2, 4, 6, 8, 12, 18, 24])
+    Vd = 0.65 * 70  # Volume of distribution
+    ke = 0.18      # Elimination rate
     
-    # محاكاة الدواء المرجعي
-    ref_conc = generate_pk_data(t_points, total_dose, 0.75, 1.5, ke, Vd)
+    # Simulate Reference (Food effect adjustment)
+    f_ref = 0.85 if "فاطر" in feeding_status else 0.75
+    ka_ref = 1.2 if "فاطر" in feeding_status else 1.8
+    ref_conc = generate_pk_data(t_points, total_dose, f_ref, ka_ref, ke, Vd)
     results = {'Time': t_points, 'Reference (RLD)': ref_conc}
     
-    # محاكاة التركيبات الثلاث بناء على المدخلات العلمية
+    # Simulate Test Formulations
     for name, data in formulations.items():
-        f_val, ka_val = 0.75, 1.5
+        f_val, ka_val = f_ref, ka_ref
         
-        # منطق تأثير الأشكال الصيدلانية
+        # Impact of Formulation Type
         if "نانو" in data['form']:
-            f_val = 0.98 if data['particle_size'] < 100 else 0.88
-            ka_val = 5.0 if data['particle_size'] < 100 else 3.5
+            # Nano particles increase surface area -> faster absorption & higher F
+            f_val = 0.95 if data['particle_size'] < 100 else 0.88
+            ka_val = 4.5 if data['particle_size'] < 100 else 3.2
         elif "حقن" in data['form']:
-            f_val = 1.0
-            ka_val = 15.0 
+            f_val = 1.0; ka_val = 12.0
         elif "SR" in data['form']:
-            f_val = 0.80
-            ka_val = 0.2 
-        elif "شراب" in data['form']:
+            f_val = 0.82; ka_val = 0.25
+        elif "شراب" in data['form'] or "جيل" in data['form']:
             ka_val = 2.5
             
         test_conc = generate_pk_data(t_points, total_dose, f_val, ka_val, ke, Vd)
         
-        # إضافة تباين إحصائي
-        noise = (0.12 / np.sqrt(num_subjects)) 
-        test_conc = test_conc * np.random.normal(1, noise, len(t_points))
+        # Add Biological Variability (In-Vivo Noise)
+        variability = 0.15 / np.sqrt(num_subjects)
+        test_conc = test_conc * np.random.normal(1, variability, len(t_points))
         results[name] = np.maximum(0, test_conc)
     
     st.session_state.df_results = pd.DataFrame(results)
     st.session_state.formulations = formulations
-    st.success("تم الانتهاء من تحليل البيانات بنجاح!")
+    st.success("تم الانتهاء من محاكاة النتائج المخبرية والحيوانية!")
 
 if st.session_state.df_results is not None:
     df = st.session_state.df_results
     
     with tab_analysis:
         st.markdown("<div class='section-card'>", unsafe_allow_html=True)
-        st.subheader("📈 منحنيات التركيز الدوائي (Plasma Concentration Profiles)")
+        st.subheader("📈 منحنيات التكافؤ الحيوي (Comparative PK Profiles)")
+        st.markdown(f"<span class='animal-tag'>نموذج حيوي: {animal_type} | الحالة: {feeding_status}</span>", unsafe_allow_html=True)
         
         col_plot, col_metrics = st.columns([2, 1])
         
@@ -201,59 +206,56 @@ if st.session_state.df_results is not None:
             for i, col in enumerate(df.columns[1:]):
                 style = '--' if 'Reference' in col else '-'
                 width = 4 if 'Reference' in col else 2.5
-                ax.plot(df['Time'], df[col], label=col, marker='o', linestyle=style, color=colors[i % len(colors)], linewidth=width, markersize=4)
+                ax.plot(df['Time'], df[col], label=col, marker='o', linestyle=style, color=colors[i % len(colors)], linewidth=width)
             
             ax.set_xlabel("Time (Hours)", fontweight='bold')
-            ax.set_ylabel("Concentration (μg/mL)", fontweight='bold')
+            ax.set_ylabel("Plasma Conc. (μg/mL)", fontweight='bold')
             ax.set_title(f"Bioequivalence Study: {api_name}", fontsize=14, fontweight='bold', color='#1e3a8a')
-            ax.grid(True, which='both', linestyle='--', alpha=0.5)
-            ax.legend(frameon=True, shadow=True)
+            ax.legend()
+            ax.grid(True, alpha=0.3)
             st.pyplot(fig)
             
         with col_metrics:
-            st.markdown("### 🎯 المقاييس الحيوية (PK Parameters)")
+            st.markdown("### 🎯 نتائج المقارنة الفنية")
             
-            # حساب وعرض نتائج الدواء المرجعي أولاً
-            ref_col = df.columns[1] # Reference (RLD)
+            # Reference Metrics
+            ref_col = df.columns[1]
             cmax_ref = df[ref_col].max()
             tmax_ref = df.iloc[df[ref_col].idxmax()]['Time']
             auc_ref = get_auc(df[ref_col], df['Time'])
             
             st.markdown(f"<div class='reference-section'>", unsafe_allow_html=True)
-            st.markdown(f"**🏅 الدواء المرجعي: {ref_drug}**")
+            st.markdown(f"**🏅 المرجع: {ref_drug}**")
             rm1, rm2, rm3 = st.columns(3)
             rm1.markdown(f"<p class='metric-label'>Cmax</p><p class='metric-value'>{cmax_ref:.2f}</p>", unsafe_allow_html=True)
-            rm2.markdown(f"<p class='metric-label'>Tmax (h)</p><p class='metric-value'>{tmax_ref:.1f}</p>", unsafe_allow_html=True)
+            rm2.markdown(f"<p class='metric-label'>Tmax</p><p class='metric-value'>{tmax_ref:.1f}</p>", unsafe_allow_html=True)
             rm3.markdown(f"<p class='metric-label'>AUC</p><p class='metric-value'>{auc_ref:.1f}</p>", unsafe_allow_html=True)
             st.markdown("</div>", unsafe_allow_html=True)
             
             st.divider()
             
-            # عرض نتائج التركيبات المختبرة والمقارنة
+            # Test Metrics
             for col in df.columns[2:]:
-                cmax_test = df[col].max()
-                tmax_test = df.iloc[df[col].idxmax()]['Time']
-                auc_test = get_auc(df[col], df['Time'])
-                be_ratio = (auc_test / auc_ref) * 100
+                c_test = df[col].max()
+                t_test = df.iloc[df[col].idxmax()]['Time']
+                a_test = get_auc(df[col], df['Time'])
+                ratio = (a_test / auc_ref) * 100
                 
-                with st.expander(f"التحليل التفصيلي: {col}", expanded=True):
+                with st.expander(f"نتائج {col}", expanded=True):
                     m1, m2, m3 = st.columns(3)
-                    m1.markdown(f"<p class='metric-label'>Cmax</p><p class='metric-value'>{cmax_test:.2f}</p>", unsafe_allow_html=True)
-                    m2.markdown(f"<p class='metric-label'>Tmax (h)</p><p class='metric-value'>{tmax_test:.1f}</p>", unsafe_allow_html=True)
-                    m3.markdown(f"<p class='metric-label'>AUC</p><p class='metric-value'>{auc_test:.1f}</p>", unsafe_allow_html=True)
+                    m1.markdown(f"<p class='metric-label'>Cmax</p><p class='metric-value'>{c_test:.2f}</p>", unsafe_allow_html=True)
+                    m2.markdown(f"<p class='metric-label'>Tmax</p><p class='metric-value'>{t_test:.1f}</p>", unsafe_allow_html=True)
+                    m3.markdown(f"<p class='metric-label'>AUC</p><p class='metric-value'>{a_test:.1f}</p>", unsafe_allow_html=True)
                     
-                    st.write(f"**نسبة AUC المقارنة:** {be_ratio:.1f}%")
-                    is_be = 80 <= be_ratio <= 125
-                    status = "متكافئ حيوياً ✅" if is_be else "غير متكافئ ❌"
+                    is_be = 80 <= ratio <= 125
+                    status = "متكافئ ✅" if is_be else "غير متكافئ ❌"
                     cls = "status-pass" if is_be else "status-fail"
-                    st.markdown(f"<center><span class='{cls}'>{status}</span></center>", unsafe_allow_html=True)
+                    st.markdown(f"<center><span class='{cls}'>{status} ({ratio:.1f}%)</span></center>", unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
     with tab_library:
         st.markdown("<div class='section-card'>", unsafe_allow_html=True)
-        st.subheader("📚 المراجع والمكتبات العلمية الموثقة")
-        st.info("تم ربط هذه المراجع مباشرة بقواعد البيانات العالمية لضمان دقة البحث العلمي.")
-        
+        st.subheader("📚 المراجع الرقابية والبحثية المعتمدة")
         for cat, items in REGULATORY_LIBRARY.items():
             st.markdown(f"#### 🏷️ {cat}")
             for item in items:
@@ -263,32 +265,28 @@ if st.session_state.df_results is not None:
 
     with tab_report:
         st.markdown("<div class='section-card'>", unsafe_allow_html=True)
-        st.subheader("📄 التقرير الفني الشامل لنتائج البحث")
+        st.subheader("📄 التقرير النهائي (Technical Summary Report)")
+        st.markdown(f"**بروتوكول الدراسة:** {animal_type} - {feeding_status}")
+        st.markdown(f"**نتائج المرجع ({ref_drug}):** AUC={auc_ref:.2f}, Cmax={cmax_ref:.2f}")
         
-        st.write(f"**المادة الخاضعة للدراسة:** {api_name}")
-        st.write(f"**الدواء المرجعي المستخدم:** {ref_drug}")
-        st.write(f"**تاريخ التحليل:** 2026-05-05")
-        
-        # إضافة نتائج المرجعي للتقرير
-        st.markdown(f"**📊 نتائج الدواء المرجعي:** AUC: {auc_ref:.2f} | Cmax: {cmax_ref:.2f} | Tmax: {tmax_ref:.1f}")
-        
-        report_data = []
+        rep_df = []
         for name, data in st.session_state.formulations.items():
-            report_data.append({
-                "التركيبة": name,
-                "الصورة الصيدلانية": data['form'],
-                "تقنية النانو (nm)": data['particle_size'] if data['particle_size'] > 0 else "غير مفعلة",
-                "مواد التحميل": ", ".join(data['excipients'])
+            c_val = df[name].max()
+            a_val = get_auc(df[name], df['Time'])
+            rep_df.append({
+                "المنتج": name,
+                "الشكل": data['form'],
+                "النانو (nm)": data['particle_size'] if data['particle_size'] > 0 else "-",
+                "Cmax": f"{c_val:.2f}",
+                "AUC": f"{a_val:.2f}",
+                "التكافؤ %": f"{(a_val/auc_ref)*100:.1f}%"
             })
-        
-        st.dataframe(pd.DataFrame(report_data), use_container_width=True)
-        
-        st.warning("⚠️ ملاحظة: هذه النتائج مبنية على نماذج محاكاة رياضية متقدمة (In-Silico Modeling) ويجب تأكيدها بتجارب سريرية نهائية.")
-        st.download_button("📥 تحميل التقرير بصيغة CSV", df.to_csv(index=False), "Sama_Pharma_BE_Report.csv")
+        st.table(pd.DataFrame(rep_df))
+        st.download_button("📥 تحميل التقرير (CSV)", df.to_csv(index=False), "Sama_Pharma_Full_Report.csv")
         st.markdown("</div>", unsafe_allow_html=True)
 
 else:
-    st.info("💡 للبدء: قم بإدخال بيانات التركيبات في التبويب الأول واضغط على زر 'تشغيل التحليل'.")
+    st.info("💡 يرجى ضبط إعدادات الدراسة في التبويب الأول ثم الضغط على 'تشغيل التحليل'.")
 
 st.divider()
-st.caption("Developed by Sama Pharma Tech | R&D Excellence Hub v5.0")
+st.caption("Developed by Sama Pharma Tech | R&D Hub v6.0 - Global Standards Compliance")
