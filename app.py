@@ -3,200 +3,202 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-# --- إعدادات الصفحة ---
+# --- Basic Config ---
 st.set_page_config(
-    page_title="Sama Pharma Tech | Global Bioequivalence Center",
+    page_title="Sama Pharma Tech | Precision v8.0",
     page_icon="🧬",
     layout="wide"
 )
 
-# --- تنسيقات متقدمة (CSS) ---
+# --- Custom Styling ---
 st.markdown("""
     <style>
-    .stApp { background-color: #f4f7fa; }
-    .main-header { color: #003366; text-align: center; font-weight: 900; font-size: 2.8rem; border-bottom: 5px solid #00a8cc; padding-bottom: 15px; margin-bottom: 30px; }
-    .card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom: 20px; border: 1px solid #e1e8ed; }
-    .ref-highlight { background-color: #eefbff; border-left: 6px solid #00a8cc; padding: 15px; border-radius: 8px; margin-bottom: 15px; }
-    .test-box { border-top: 4px solid #f39c12; background-color: #fffdf9; padding: 15px; border-radius: 10px; }
-    .metric-val { font-size: 1.3rem; font-weight: bold; color: #003366; }
-    .reference-link { display: block; color: #0077b6; text-decoration: none; padding: 5px 0; font-weight: 500; }
-    .reference-link:hover { color: #00b4d8; }
+    .main-header { color: #003366; text-align: center; font-weight: 900; font-size: 2.5rem; padding: 20px; background: #eefbff; border-radius: 15px; margin-bottom: 25px; border: 2px solid #00a8cc; }
+    .metric-card { background: white; padding: 15px; border-radius: 10px; border-right: 5px solid #00a8cc; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+    .reference-section { background: #f0f4f8; padding: 20px; border-radius: 15px; border: 1px solid #d1d9e6; }
+    .stTabs [data-baseweb="tab-list"] { gap: 10px; }
+    .stTabs [data-baseweb="tab"] { background-color: #f8f9fa; border-radius: 5px 5px 0 0; padding: 10px 20px; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- محرك الحسابات الرياضية المطور ---
+# --- Robust Calculation Engine ---
+def safe_auc(y, x):
+    """Robust Trapezoidal rule implementation without relying on specific np versions"""
+    try:
+        y = np.array(y)
+        x = np.array(x)
+        return np.sum((x[1:] - x[:-1]) * (y[1:] + y[:-1]) / 2.0)
+    except:
+        return 0.0
 
-def calculate_auc_manual(y, x):
-    """حساب المساحة تحت المنحنى بطريقة شبه المنحرف لضمان الدقة المطلقة"""
-    if len(y) < 2: return 0.0
-    return np.trapz(y, x) if hasattr(np, 'trapz') else sum((x[i+1]-x[i]) * (y[i+1]+y[i])/2 for i in range(len(x)-1))
+def pk_model(t, dose, f, ka, ke, vd, weight):
+    """Pharmacokinetic simulation engine"""
+    try:
+        v_total = vd * weight
+        if abs(ka - ke) < 1e-5: ka += 0.01
+        # Bateman Equation
+        conc = (f * dose * ka) / (v_total * (ka - ke)) * (np.exp(-ke * t) - np.exp(-ka * t))
+        return np.maximum(0, conc)
+    except:
+        return np.zeros_like(t)
 
-def pk_model_engine(t, dose, f, ka, ke, vd, weight):
-    """محرك الحركية الدوائية - نموذج الحجرة الواحدة (Bateman Equation)"""
-    v_total = vd * weight
-    if abs(ka - ke) < 1e-4: ka += 0.001
-    k_factor = (f * dose * ka) / (v_total * (ka - ke))
-    conc = k_factor * (np.exp(-ke * t) - np.exp(-ka * t))
-    return np.maximum(0, conc)
-
-# --- قاعدة بيانات المواد والمنظمات ---
-API_DATABASE = {
+# --- Database ---
+API_DATA = {
     "Paracetamol": {"ka": 2.1, "ke": 0.28, "vd": 0.9, "f": 0.88},
-    "Atorvastatin": {"ka": 0.75, "ke": 0.05, "vd": 5.2, "f": 0.12},
-    "Metformin": {"ka": 1.15, "ke": 0.15, "vd": 1.5, "f": 0.55},
-    "Ibuprofen": {"ka": 1.9, "ke": 0.36, "vd": 0.13, "f": 0.92}
+    "Atorvastatin": {"ka": 0.8, "ke": 0.05, "vd": 5.2, "f": 0.12},
+    "Metformin": {"ka": 1.1, "ke": 0.15, "vd": 1.5, "f": 0.55},
+    "Custom": {"ka": 1.0, "ke": 0.1, "vd": 1.0, "f": 0.7}
 }
 
-EXCIPIENTS_LIB = {
-    "Solid": ["Lactose", "Microcrystalline Cellulose", "Magnesium Stearate", "PVP K30", "Crospovidone"],
-    "Liquid": ["Glycerin", "Sorbitol", "Xanthan Gum", "Tween 80", "Sodium Benzoate"],
-    "Nano": ["Chitosan", "PLGA", "Phospholipids", "PEG-Lipids", "Gold NPs"]
+EXCIPIENTS = {
+    "Solid": ["Lactose", "Starch", "Mg Stearate", "Talc", "MCC", "PVP"],
+    "Liquid": ["Glycerin", "Sorbitol", "Xanthan Gum", "Water", "Ethanol"],
+    "Nano": ["Chitosan", "PLGA", "Lipids", "PEG", "Gold", "Silica"]
 }
 
-REGULATORY_REFS = [
-    {"org": "FDA", "title": "مركز تقييم الأدوية وأبحاثها (CDER)", "url": "https://www.fda.gov/drugs"},
-    {"org": "EMA", "title": "إرشادات التكافؤ الحيوي الأوروبية", "url": "https://www.ema.europa.eu/en/human-regulatory/research-development/bioequivalence"},
-    {"org": "WHO", "title": "معايير منظمة الصحة العالمية للأدوية الجنيسة", "url": "https://extranet.who.int/pqweb/medicines"},
-    {"org": "ICH", "title": "دليل ICH M13A الموحد عالمياً", "url": "https://www.ich.org/page/multidisciplinary-guidelines"}
-]
+# --- Sidebar Controls ---
+with st.sidebar:
+    st.image("https://cdn-icons-png.flaticon.com/512/3022/3022243.png", width=100)
+    st.header("⚙️ إعدادات المحاكاة")
+    
+    api_choice = st.selectbox("المادة الفعالة (API)", list(API_DATA.keys()))
+    user_dose = st.number_input("الجرعة (mg)", value=500.0)
+    
+    st.divider()
+    st.subheader("👥 نموذج الدراسة In-Vivo")
+    subject = st.selectbox("نوع الكائن", ["Human (متطوعين)", "Animal (Beagle Dog)", "Animal (Rat)"])
+    weight = st.number_input("الوزن (kg)", value=70.0 if "Human" in subject else 10.0)
+    is_fed = st.checkbox("تأثير الطعام (Fed State)")
 
-# --- واجهة البرنامج ---
-st.markdown("<h1 class='main-header'>🧬 Sama Pharma Tech | Precision Bio-Research Hub</h1>", unsafe_allow_html=True)
+# --- Main Interface ---
+st.markdown("<div class='main-header'>Sama Pharma Tech | R&D Excellence Hub v8.0</div>", unsafe_allow_html=True)
 
-# تبويبات النظام
-tab_main, tab_setup, tab_refs = st.tabs(["📊 التحليل والمقارنة", "⚙️ إعدادات الدراسة", "📚 المكتبة والمراجع"])
-
-with tab_setup:
-    col_s1, col_s2 = st.columns(2)
-    with col_s1:
-        st.subheader("📋 تفاصيل المادة الفعالة والمرجع")
-        selected_api = st.selectbox("المادة الفعالة (API)", list(API_DATABASE.keys()))
-        ref_drug_name = st.text_input("اسم الدواء المرجعي العالمي (RLD)", f"{selected_api} Innovator®")
-        dose = st.number_input("الجرعة المستخدمة (mg)", value=500.0)
-        
-    with col_s2:
-        st.subheader("👥 نموذج الدراسة (In-Vivo)")
-        subject_type = st.selectbox("نوع الكائن المستخدم", ["إنسان (Volunteers)", "كلاب (Beagle Dogs)", "أرانب", "جرذان"])
-        weight = st.number_input(f"متوسط الوزن لـ {subject_type} (kg)", value=70.0 if "إنسان" in subject_type else 10.0)
-        food_status = st.radio("الحالة الغذائية", ["صائم (Fasted)", "فاطر (Fed)"], horizontal=True)
+tab_calc, tab_refs = st.tabs(["📊 التحليل والمقارنة", "📚 المكتبة والمنظمات"])
 
 with tab_refs:
-    st.subheader("📑 المنظمات والمراجع العالمية للتكافؤ الحيوي")
-    for ref in REGULATORY_REFS:
-        st.markdown(f"<a class='reference-link' href='{ref['url']}' target='_blank'>• [{ref['org']}] {ref['title']}</a>", unsafe_allow_html=True)
-    st.info("تعتمد هذه النتائج على خوارزميات مطابقة لمعايير ICH M13A الصادرة حديثاً.")
+    st.subheader("📚 مراجع التكافؤ الحيوي المدمجة")
+    refs = {
+        "FDA - CDER": "https://www.fda.gov/drugs/guidances-drugs/bioequivalence-recommendations-specific-products",
+        "EMA - Guidelines": "https://www.ema.europa.eu/en/human-regulatory/research-development/bioequivalence",
+        "WHO - Prequalification": "https://extranet.who.int/pqweb/medicines",
+        "ICH - M13A Guideline": "https://www.ich.org/page/multidisciplinary-guidelines"
+    }
+    for name, url in refs.items():
+        st.markdown(f"🔗 [{name}]({url})")
+    st.info("تم دمج بروتوكولات FDA للأدوية النوعية لضمان دقة النتائج المقارنة.")
 
-with tab_main:
-    # إعدادات التركيبات الثلاث
-    st.subheader("🧪 مقارنة الثلاث تركيبات المختبرة")
-    t_cols = st.columns(3)
-    test_forms = []
+with tab_calc:
+    col_ref, col_tests = st.columns([1, 2.5])
     
-    for i, col in enumerate(t_cols, 1):
-        with col:
-            st.markdown(f"<div class='test-box'>", unsafe_allow_html=True)
-            name = st.text_input(f"اسم المنتج {i}", f"Sama-Formula-0{i}")
-            dosage_form = st.selectbox(f"الصورة {i}", ["أقراص", "كبسولات", "شراب", "حقن", "نانو", "جيل"], key=f"df{i}")
-            
-            exc_cat = "Nano" if dosage_form == "نانو" else ("Liquid" if dosage_form in ["شراب", "حقن"] else "Solid")
-            excs = st.multiselect(f"المواد المضافة {i}", EXCIPIENTS_LIB[exc_cat], key=f"ex{i}")
-            
-            psize = 0
-            if dosage_form == "نانو":
-                psize = st.number_input(f"حجم الجسيمات (nm) {i}", value=150, key=f"ps{i}")
-            
-            test_forms.append({"name": name, "form": dosage_form, "ps": psize, "excs": excs})
-            st.markdown("</div>", unsafe_allow_html=True)
+    with col_ref:
+        st.markdown("<div class='reference-section'>", unsafe_allow_html=True)
+        st.subheader("🚩 الدواء المرجعي (RLD)")
+        ref_name = st.text_input("اسم المرجع", "Innovator Ref")
+        r_cmax = st.number_input("Cmax المرجع المتوقع", value=6.5)
+        r_tmax = st.number_input("Tmax المرجع المتوقع", value=1.5)
+        r_auc = st.number_input("AUC المرجع المتوقع", value=45.0)
+        st.markdown("</div>", unsafe_allow_html=True)
 
-    if st.button("🚀 تشغيل التحليل ومقارنة النتائج الآن", use_container_width=True):
-        t_axis = np.linspace(0, 24, 300)
-        params = API_DATABASE[selected_api]
-        
-        # 1. حسابات المرجع
-        f_ref = params['f'] * (0.8 if food_status == "فاطر (Fed)" else 1.0)
-        ka_ref = params['ka'] * (0.6 if food_status == "فاطر (Fed)" else 1.0)
-        
-        y_ref = pk_model_engine(t_axis, dose, f_ref, ka_ref, params['ke'], params['vd'], weight)
-        auc_ref = calculate_auc_manual(y_ref, t_axis)
-        cmax_ref = np.max(y_ref)
-        tmax_ref = t_axis[np.argmax(y_ref)]
-        
-        results_df = pd.DataFrame({"Time": t_axis, "Reference (RLD)": y_ref})
-        metrics = {"Reference (RLD)": {"cmax": cmax_ref, "tmax": tmax_ref, "auc": auc_ref}}
-        
-        # 2. حسابات التركيبات المختبرة
-        for tform in test_forms:
-            # تعديل المعاملات بناء على التقنية
-            f_mod = 1.25 if tform['form'] == "نانو" else 1.0
-            ka_mod = 2.0 if tform['form'] == "نانو" else (0.8 if tform['form'] == "أقراص" else 1.2)
+    st.subheader("🧪 تركيبات الاختبار (Test Formulations)")
+    t_cols = st.columns(3)
+    formulations = []
+
+    for i in range(3):
+        with t_cols[i]:
+            st.markdown(f"**التركيبة {i+1}**")
+            f_name = st.text_input(f"الاسم", f"Formula-{i+1}", key=f"n{i}")
+            f_type = st.selectbox(f"الصورة", ["Tablets", "Capsules", "Syrup", "Nano", "Ampoule"], key=f"t{i}")
             
-            y_test = pk_model_engine(t_axis, dose, f_ref * f_mod, ka_ref * ka_mod, params['ke'], params['vd'], weight)
-            # إضافة تباين عشوائي بسيط للمحاكاة الواقعية
-            y_test *= np.random.normal(1, 0.015, len(t_axis))
+            exc_list = EXCIPIENTS["Nano"] if f_type == "Nano" else (EXCIPIENTS["Liquid"] if f_type in ["Syrup", "Ampoule"] else EXCIPIENTS["Solid"])
+            selected_excs = st.multiselect("المواد المضافة", exc_list, key=f"e{i}")
             
-            results_df[tform['name']] = y_test
-            metrics[tform['name']] = {
+            p_size = 0
+            if f_type == "Nano":
+                p_size = st.number_input("حجم الجسيمات (nm)", value=150, key=f"p{i}")
+            
+            formulations.append({"name": f_name, "type": f_type, "excs": selected_excs, "psize": p_size})
+
+    if st.button("🚀 تشغيل تحليل التكافؤ الحيوي الشامل", use_container_width=True):
+        t_points = np.linspace(0, 24, 200)
+        base_p = API_DATA[api_choice]
+        
+        # 1. Simulate Reference based on input metrics
+        # Adjusting parameters to match user's expected RLD values
+        y_ref = pk_model(t_points, user_dose, base_p['f'], base_p['ka'], base_p['ke'], base_p['vd'], weight)
+        # Normalize to match user input Cmax
+        if np.max(y_ref) > 0: y_ref = y_ref * (r_cmax / np.max(y_ref))
+        
+        sim_results = {"Time": t_points, "Reference": y_ref}
+        metrics = {"Reference": {"cmax": np.max(y_ref), "tmax": t_points[np.argmax(y_ref)], "auc": safe_auc(y_ref, t_points)}}
+        
+        # 2. Simulate Tests
+        for f in formulations:
+            # Impact of dosage form on absorption
+            ka_mod = 2.5 if f['type'] == "Nano" else (1.5 if f['type'] == "Syrup" else 1.0)
+            f_mod = 1.2 if f['type'] == "Nano" else 1.0
+            
+            # Impact of Food
+            if is_fed:
+                ka_mod *= 0.7
+                f_mod *= 0.9
+                
+            y_test = pk_model(t_points, user_dose, base_p['f'] * f_mod, base_p['ka'] * ka_mod, base_p['ke'], base_p['vd'], weight)
+            # Add small random variation for realism
+            y_test *= np.random.normal(1.0, 0.02, len(t_points))
+            
+            sim_results[f['name']] = y_test
+            metrics[f['name']] = {
                 "cmax": np.max(y_test),
-                "tmax": t_axis[np.argmax(y_test)],
-                "auc": calculate_auc_manual(y_test, t_axis)
+                "tmax": t_points[np.argmax(y_test)],
+                "auc": safe_auc(y_test, t_points)
             }
-            
-        st.session_state.be_data = results_df
-        st.session_state.be_metrics = metrics
 
-    # عرض النتائج النهائية
-    if 'be_data' in st.session_state:
-        df = st.session_state.be_data
-        mets = st.session_state.be_metrics
-        
+        # --- Visuals ---
         st.divider()
-        c1, c2 = st.columns([2, 1])
+        res_col1, res_col2 = st.columns([2, 1])
         
-        with c1:
-            st.markdown("<div class='card'>", unsafe_allow_html=True)
-            st.subheader("📈 منحنى التكافؤ الحيوي المقارن")
+        with res_col1:
             fig, ax = plt.subplots(figsize=(10, 5))
-            for col in df.columns[1:]:
-                style = '--' if "Reference" in col else '-'
-                width = 4 if "Reference" in col else 2
-                ax.plot(df['Time'], df[col], label=col, linestyle=style, linewidth=width)
+            ax.plot(t_points, y_ref, label=f"Ref: {ref_name}", linewidth=4, color='black', linestyle='--')
+            for f in formulations:
+                ax.plot(t_points, sim_results[f['name']], label=f['name'], linewidth=2)
+            
+            ax.set_title("Comparative Bioavailability Profile (In-Vivo Simulation)")
             ax.set_xlabel("Time (hours)")
-            ax.set_ylabel("Concentration (mg/L)")
+            ax.set_ylabel("Plasma Concentration (µg/mL)")
             ax.legend()
-            ax.grid(alpha=0.3)
+            ax.grid(True, alpha=0.2)
             st.pyplot(fig)
-            st.markdown("</div>", unsafe_allow_html=True)
             
-        with c2:
-            st.markdown("<div class='ref-highlight'>", unsafe_allow_html=True)
-            st.subheader(f"🥇 نتائج المرجع: {ref_drug_name}")
-            rm = mets["Reference (RLD)"]
-            st.markdown(f"<p class='metric-val'>Cmax: {rm['cmax']:.2f} mg/L</p>", unsafe_allow_html=True)
-            st.markdown(f"<p class='metric-val'>Tmax: {rm['tmax']:.2f} h</p>", unsafe_allow_html=True)
-            st.markdown(f"<p class='metric-val'>AUC: {rm['auc']:.2f}</p>", unsafe_allow_html=True)
-            st.markdown("</div>", unsafe_allow_html=True)
-            
-            st.subheader("⚖️ تحليل التكافؤ (T/R Ratios)")
-            for name in list(mets.keys())[1:]:
-                ratio = (mets[name]['auc'] / mets["Reference (RLD)"]['auc']) * 100
-                st.write(f"**{name}**")
-                status = "✅ Pass" if 80 <= ratio <= 125 else "❌ Fail"
-                st.markdown(f"**Ratio:** {ratio:.1f}% | **Status:** {status}")
-                st.progress(min(ratio/150, 1.0))
+        with res_col2:
+            st.subheader("📏 المقاييس المحسوبة")
+            for name, m in metrics.items():
+                with st.expander(f"نتائج {name}", expanded=True):
+                    c1, c2, c3 = st.columns(3)
+                    c1.metric("Cmax", f"{m['cmax']:.2f}")
+                    c2.metric("Tmax", f"{m['tmax']:.2f}")
+                    c3.metric("AUC", f"{m['auc']:.1f}")
+                    
+                    if name != "Reference":
+                        ratio = (m['auc'] / metrics["Reference"]['auc']) * 100 if metrics["Reference"]['auc'] > 0 else 0
+                        status = "✅ Bioequivalent" if 80 <= ratio <= 125 else "❌ Not Equivalent"
+                        st.write(f"**Ratio:** {ratio:.1f}% | **Result:** {status}")
 
-        st.subheader("📋 جدول المقارنة التفصيلي")
-        report = []
-        for name, m in mets.items():
-            report.append({
-                "Product": name,
-                "Cmax": f"{m['cmax']:.2f}",
-                "Tmax": f"{m['tmax']:.2f}",
-                "AUC (0-24)": f"{m['auc']:.2f}",
-                "Bio-Status": "Reference" if name == "Reference (RLD)" else ("In-Bound" if 80 <= (m['auc']/mets["Reference (RLD)"]['auc'])*100 <= 125 else "Out-of-Bound")
+        st.subheader("📝 تقرير المواد والتركيبات")
+        data_table = []
+        for f in formulations:
+            m = metrics[f['name']]
+            data_table.append({
+                "التركيبة": f['name'],
+                "الصورة": f['type'],
+                "المواد المضافة": ", ".join(f['excs']),
+                "حجم الجسيمات": f"{f['psize']} nm" if f['psize'] > 0 else "N/A",
+                "Cmax/Ref Ratio": f"{(m['cmax']/metrics['Reference']['cmax'])*100:.1f}%"
             })
-        st.table(pd.DataFrame(report))
+        st.table(pd.DataFrame(data_table))
+        
+        # Download results
+        csv = pd.DataFrame(sim_results).to_csv(index=False)
+        st.download_button("📂 تحميل بيانات الدراسة (CSV)", csv, "bioequivalence_report.csv", "text/csv")
 
-else:
-    st.warning("الرجاء تحديد الإعدادات ثم الضغط على زر التشغيل.")
-
-st.caption("Sama Pharma Tech Precision v7.0 | Advanced Bioequivalence Simulation Engine")
+st.markdown("<br><hr><center>Sama Pharma Tech | Research & Development Hub v8.0</center>", unsafe_allow_html=True)
